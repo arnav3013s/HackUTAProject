@@ -1,0 +1,5 @@
+.env
+content.json
+data/
+node_modules/
+public/hero.mp4
