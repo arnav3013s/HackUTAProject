@@ -91,13 +91,13 @@ test('the fan lab, assistant, and activity read distinct stored histories', asyn
   assert.equal((await get('/api/fans')).status, 403);
   await post('demo');
   const { fans, groups } = await (await get('/api/fans')).json();
-  assert.equal(fans.length, 56);
-  assert.equal(new Set(fans.map(fan => fan.id)).size, 56);
-  for (const group of groups) assert.equal(fans.filter(fan => fan.category === group).length, 8);
-  const collector = fans.find(fan => fan.category === 'Collector');
-  const record = await (await get(`/api/fans?id=${collector.id}`)).json();
+  assert.equal(fans.length, 4);
+  assert.equal(new Set(fans.map(fan => fan.id)).size, 4);
+  for (const group of groups) assert.equal(fans.filter(fan => fan.category === group).length, 1);
+  const regular = fans.find(fan => fan.category === 'Normal User');
+  const record = await (await get(`/api/fans?id=${regular.id}`)).json();
   assert.equal(record.ledger.reduce((sum, item) => sum + item.points, 0), record.balance);
-  assert.equal(record.spent, 80);
+  assert.equal(record.spent, 0);
   assert.equal((await get(`/api/fans?id=${(await state()).user.id}`)).status, 404);
 
   const clip = (await state()).faze.videos[0].id;
@@ -113,7 +113,7 @@ test('the fan lab, assistant, and activity read distinct stored histories', asyn
   assert.equal((await post('archive-quiz', { year: '2010' }))[0], 409);
   const [status, answer] = await post('ask', { question: 'What is my wallet balance?' });
   assert.equal(status, 200);
-  assert.equal(answer.mode, 'Replay guide');
+  assert.equal(answer.mode, 'Clan guide');
   assert.match(answer.answer, /220 available points/);
 });
 
@@ -155,7 +155,7 @@ test('match placement and time change a profile without double-crediting retries
   const [, estimate] = await post('ask', { question: 'How many points for 35 minutes and 3rd of 20?' });
   assert.match(estimate.answer, /0 points.*7 for time and 18 for placement/);
   const list = await (await get('/api/fans')).json();
-  const chosen = list.fans.find(fan => fan.category === 'Creator reviewer');
+  const chosen = list.fans.find(fan => fan.category === 'Streamer');
   assert.equal((await post('preview-fan', { id: chosen.id }))[0], 200);
   const preview = (await state()).user;
   assert.notEqual(preview.id, chosen.id);
@@ -176,7 +176,7 @@ test('Gemini failures keep the requested patch evidence and do not pollute exact
   const provider = t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 429 }));
   const context = { patches: [samplePatch], analytics: { clips: [] } };
   const result = await answerFan('Why?', { ...context, previous: 'What tier is MP9?' });
-  assert.equal(result.mode, 'Replay guide');
+  assert.equal(result.mode, 'Clan guide');
   assert.match(result.answer, /MP9 is B tier/);
   assert.match(result.status, /request limit/);
   assert.equal(result.sources[0].url, '#patches');
@@ -227,12 +227,26 @@ test('walkthrough, daily missions, and referral points persist across two fan se
   assert.equal((await state()).user.referred, false);
 });
 
+test('preview email referrals stay pending until the invitee completes a challenge', async t => {
+  const { post, state, client } = await fixture(t, '1');
+  assert.equal((await post('signup', { name: 'Inviter', email: 'inviter@example.com', password: 'long-password-1' }))[0], 200);
+  const inviter = (await state()).user;
+  const invitee = client();
+  assert.equal((await invitee.post('signup', { name: 'Invitee', email: 'invitee@example.com', password: 'long-password-2', invite: inviter.invite }))[0], 200);
+  assert.equal((await state()).user.referrals[0].status, 'pending');
+  assert.equal((await state()).user.balance, 0);
+  assert.equal((await invitee.post('check-in'))[0], 200);
+  assert.equal((await state()).user.referrals[0].status, 'approved');
+  assert.equal((await state()).user.balance, 40);
+  assert.equal((await invitee.state()).user.balance, 25);
+});
+
 test('returning fans keep an earned comeback while they replay a daily mission', async t => {
   const { get, post, state } = await fixture(t, '1');
   await post('demo');
   const original = (await state()).user;
   const { fans } = await (await get('/api/fans')).json();
-  const sample = fans.find(fan => fan.category === 'Returning fan');
+  const sample = fans.find(fan => fan.category === 'Returning User');
   assert.equal((await post('preview-fan', { id: sample.id }))[0], 200);
   const before = (await state()).user;
   assert.equal(before.journey.stage, 'returning');

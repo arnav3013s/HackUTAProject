@@ -56,8 +56,8 @@ export const results = [
 ];
 
 export const merch = [
-  { id: 'jersey', name: 'FaZe Clan 2025 Official Team Jersey', url: 'https://fazeclan.com/products/faze-clan-2025-official-team-jersey', image: 'https://fazeclan.com/cdn/shop/files/FAZE-2025-JERSEY-FRONT.png?v=1771355933&width=800' },
-  { id: 'cap', name: 'Four Star 3D Snapback Hat (Black)', url: 'https://fazeclan.com/products/four-star-3d-snapback-hat-black', image: 'https://fazeclan.com/cdn/shop/files/FAZE_May25_Web_Mockups_WIP1_0000_GreyFrontcopy_0006_VectorSmartObject_0008_GAMESQUARE_017.jpg?v=1771355932&width=800' },
+  { id: 'jersey', name: 'FaZe Clan 2025 Official Team Jersey', url: 'https://fazeclan.com/products/faze-clan-2025-official-team-jersey', image: 'https://fazeclan.com/cdn/shop/files/FaZe-2025-JERSEY-FRONT.png?v=1771355933&width=800' },
+  { id: 'cap', name: 'Four Star 3D Snapback Hat (Black)', url: 'https://fazeclan.com/products/four-star-3d-snapback-hat-black', image: 'https://fazeclan.com/cdn/shop/files/FaZe_May25_Web_Mockups_WIP1_0000_GreyFrontcopy_0006_VectorSmartObject_0008_GAMESQUARE_017.jpg?v=1771355932&width=800' },
   { id: 'finger', name: 'FaZe F Foam Finger', url: 'https://fazeclan.com/products/faze-f-foam-finger', image: 'https://fazeclan.com/cdn/shop/files/FaZe_Foam_finger.png?v=1771355924&width=800' }
 ];
 

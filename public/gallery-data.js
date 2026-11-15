@@ -19,15 +19,6 @@ export const gallery = [
     "credit": "Nerd Street"
   },
   {
-    "id": 3,
-    "game": "r6",
-    "title": "The first Six Invitational title",
-    "subject": "FaZe Clan · 2025",
-    "url": "https://esportsinsider.com/wp-content/uploads/2025/02/FaZe-Clan-Six-Invitational-edited.jpg",
-    "source": "https://esportsinsider.com/2025/02/faze-clan-r6-six-invitational-2025-champions",
-    "credit": "Esports Insider / Ubisoft"
-  },
-  {
     "id": 4,
     "game": "cs",
     "title": "The Antwerp champions on stage",
@@ -77,18 +68,9 @@ export const gallery = [
     "game": "cod",
     "title": "FaZe Vegas lift the trophy",
     "subject": "FaZe Vegas · CDL Champs 2026",
-    "url": "https://www.gamereactor.fr/media/20/fazevegassmashes_4952023b.jpg",
+    "url": "https://www.gamereactor.fr/media/20/fazevegassmashes_4952023_1600x900.jpg",
     "source": "https://www.gamereactor.fr/faze-vegas-ecrase-optic-texas-lors-de-la-grande-finale-du-championnat-call-of-duty-league-2026-2167123/",
     "credit": "Gamereactor"
-  },
-  {
-    "id": 10,
-    "game": "cs",
-    "title": "Rain on the Major stage",
-    "subject": "FaZe rain · 2025",
-    "url": "https://img-cdn.hltv.org/gallerypicture/mpCTJiei5005CSu4zK-d6b.jpg?auto=compress&ixlib=java-2.1.0&m=%2Fm.png&mw=160&mx=30&my=710&q=75&s=cc1f58c8b91fa77e89174985d87d99cb&w=1200",
-    "source": "https://www.hltv.org/news/41952/rain-on-playing-with-s1mple-its-still-going-to-be-faze-style-there-are-going-to-be-a-lot-of-mistakes-but-he-has-to-get-used-to-it",
-    "credit": "HLTV"
   },
   {
     "id": 11,
@@ -107,15 +89,6 @@ export const gallery = [
     "url": "https://gfuel.com/cdn/shop/articles/road-to-the-world-cup-episode-3-faze-clan-the-og-800670_1400x.png?v=1677252288",
     "source": "https://gfuel.com/blogs/news/road-to-the-world-cup-faze-clan",
     "credit": "G FUEL"
-  },
-  {
-    "id": 13,
-    "game": "smash",
-    "title": "Sparg0 on the Smash circuit",
-    "subject": "FaZe Sparg0 · 2022",
-    "url": "https://admin.esports.gg/wp-content/uploads/2022/06/FaZe-Sparg0.jpg",
-    "source": "https://esports.gg/news/super-smash-bros/faze-sparg0-taking-a-break/",
-    "credit": "Esports.gg"
   },
   {
     "id": 14,
@@ -149,18 +122,9 @@ export const gallery = [
     "game": "fc",
     "title": "Continental Cup champions",
     "subject": "FaZe JUBJUB · FIFAe 2023",
-    "url": "https://cdn.oneesports.co.th/cdn-data/sites/3/2023/09/379633110_650166523901145_6963706988513557172_n-1024x615.jpg",
+    "url": "https://cdn.oneesports.gg/wp-content/uploads/sites/3/2023/09/379645159_1460648444775505_3976404235147800299_n.jpg",
     "source": "https://www.oneesports.co.th/ea-sports-fc/jubjub-fifae-continental/",
     "credit": "ONE Esports"
-  },
-  {
-    "id": 18,
-    "game": "mobile",
-    "title": "TonyK in the FaZe jersey",
-    "subject": "FaZe TonyK · PUBG Mobile",
-    "url": "https://img.esports.id/img/article/965120220125093204.jpg",
-    "source": "https://esports.merahputih.com/read/begini-cara-setting-sensitivitas-layout-pubg-mobile-tonyk-faze-clan-8726",
-    "credit": "Esports ID"
   },
   {
     "id": 19,
@@ -185,7 +149,7 @@ export const gallery = [
     "game": "halo",
     "title": "HCS Dallas champions",
     "subject": "FaZe Clan · 2023",
-    "url": "https://www.gamereactor.eu/media/67/fazeclanhave_4036753b.jpg",
+    "url": "https://www.gamereactor.eu/media/67/fazeclanhave_4036753_1600x900.jpg",
     "source": "https://www.gamereactor.eu/faze-clan-have-been-crowned-victors-of-hcs-dallas-1272823/",
     "credit": "Gamereactor"
   },
@@ -226,24 +190,6 @@ export const gallery = [
     "credit": "DashFight"
   },
   {
-    "id": 26,
-    "game": "apex",
-    "title": "ALGS Birmingham Championship",
-    "subject": "FaZe Phony · 2023",
-    "url": "https://liquipedia.net/commons/images/thumb/c/c6/FaZe_Phony_at_the_ALGS_Birmingham_Championship.jpg/1200px-FaZe_Phony_at_the_ALGS_Birmingham_Championship.jpg",
-    "source": "https://liquipedia.net/apexlegends/Phony",
-    "credit": "Liquipedia"
-  },
-  {
-    "id": 27,
-    "game": "rocket",
-    "title": "RLCS Worlds",
-    "subject": "FaZe mist · 2023",
-    "url": "https://liquipedia.net/commons/images/d/df/RLCS_Worlds_2023_LAN_Adela_Sznajder_mist.jpg",
-    "source": "https://liquipedia.net/rocketleague/File%3ARLCS_Worlds_2023_LAN_Adela_Sznajder_mist.jpg",
-    "credit": "Adela Sznajder / Liquipedia"
-  },
-  {
     "id": 28,
     "game": "valorant",
     "title": "Babybay on the FaZe roster",
@@ -257,7 +203,7 @@ export const gallery = [
     "game": "fc",
     "title": "FaZe at FIFAe",
     "subject": "FaZe TDKeane · FIFAe Champions Cup",
-    "url": "https://oneesports.blob.core.windows.net/cdn-data/sites/3/2021/03/164072708_10225091423774145_4824067841689972384_n.jpg",
+    "url": "https://cdn.oneesports.gg/wp-content/uploads/sites/3/2021/03/164072708_10225091423774145_4824067841689972384_n.jpg",
     "source": "https://www.oneesports.co.th/ea-sports-fc/td-keane-%E0%B9%80%E0%B8%9B%E0%B8%B4%E0%B8%94%E0%B9%83%E0%B8%88%E0%B8%AB%E0%B8%A5%E0%B8%B1%E0%B8%87-faze-clan-%E0%B8%AD%E0%B8%A2%E0%B8%B9%E0%B9%88%E0%B8%AA%E0%B8%B2%E0%B8%A2%E0%B8%AB%E0%B8%B4%E0%B8%99/",
     "credit": "ONE Esports"
   },
@@ -266,7 +212,7 @@ export const gallery = [
     "game": "mobile",
     "title": "The Thailand lineup",
     "subject": "FaZe Clan · PMPL Thailand Spring 2023",
-    "url": "https://cdn.oneesports.co.th/cdn-data/sites/3/2023/02/02F7558A-A6C4-4931-9E61-B05E31CBEBA2-1.jpeg",
+    "url": "https://cdn.oneesports.gg/wp-content/uploads/sites/3/2023/02/02F7558A-A6C4-4931-9E61-B05E31CBEBA2-1.jpeg",
     "source": "https://www.oneesports.co.th/pubg/faze-clan-pmpl-thailand-2023/",
     "credit": "ONE Esports"
   }

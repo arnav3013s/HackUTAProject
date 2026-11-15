@@ -1,6 +1,6 @@
 export const games = ['Counter-Strike 2', 'Call of Duty: Warzone', 'Rainbow Six Siege', 'Valorant', 'Apex Legends', 'Fortnite'];
 
-export const rewardRules = { daily: 15, checkIn: 5, trivia: 10, archive: 20, days: 21, referral: 40, referralWelcome: 20, referralCap: 5, minAge: 7, referralTasks: 3, review: 25, reviewCap: 10, returning: 30, creator: 5, merchCap: 2, demoBalance: 200 };
+export const rewardRules = { daily: 15, checkIn: 5, trivia: 10, watch: 5, completion: 10, weekly: 20, weeklyChest: 50, archive: 20, days: 21, expiryDays: 365, referral: 40, referralWelcome: 20, referralCap: 5, minAge: 7, referralTasks: 3, review: 25, reviewCap: 10, returning: 30, creator: 5, merchCap: 2, demoBalance: 200 };
 export const matchRules = { minutesPerPoint: 5, timeCap: 10, placementCap: 20, dailyCap: 60, recentDays: 30, rankedMatches: 3, minimumMinutes: 5, rewardWindowDays: 7 };
 
 export const creators = [
@@ -10,9 +10,17 @@ export const creators = [
   { id: 'HEX', name: 'Hex', tag: '@hexintel', game: 'Valorant', specialty: 'Best Strategist', description: 'Maps the next move. Saves utility for the swing. Shows how a team wins the round together.', score: 2160, league: 'Clutch Circuit', color: 'blue' }
 ];
 
+export const ogQuizzes = [
+  { id: 'montage', name: 'Guess the montage', prompt: 'Which early series brought FaZe trickshots together?', options: ['ILLCAMS', 'Final Round', 'Match Point'], correct: 'ILLCAMS' },
+  { id: 'clip', name: 'Name that clip', prompt: 'What is the series in FaZe’s first featured archive clip?', options: ['ILLCAMS', 'The Flank', 'Road to the World Cup'], correct: 'ILLCAMS', clip: '3o65zAETqPQ' },
+  { id: 'era', name: 'Which-era quiz', prompt: 'Which era brought FaZe to a new battle royale audience?', options: ['Trickshot', 'Vlog/House', 'Fortnite'], correct: 'Fortnite' }
+];
+
 export const products = [
+  { id: 'sample-discount', name: 'FaZe merch discount sample', price: 50, cost: 0, stock: 20, type: 'Demo discount', demoOnly: true },
   { id: 'sample-cap', name: 'FaZe Snapback reservation', price: 180, cost: 1800, stock: 6, type: 'Demo reward', merch: 'cap', demoOnly: true },
   { id: 'sample-jersey', name: 'FaZe Team Jersey reservation', price: 240, cost: 3200, stock: 4, type: 'Demo reward', merch: 'jersey', demoOnly: true },
+  { id: 'sample-gift-card', name: 'FaZe gift card sample', price: 350, cost: 1000, stock: 4, type: 'Demo gift card', demoOnly: true },
   { id: 'pass', name: 'Intel Pass', price: 80, cost: 0, stock: 100, type: 'Member access', mark: '⌁' }
 ];
 

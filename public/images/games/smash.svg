@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" role="img" aria-label="FaZe Smash division artwork">
+  <defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="#e4002b"/><stop offset="1" stop-color="#22040b"/></linearGradient></defs>
+  <rect width="1200" height="700" fill="url(#g)"/>
+  <path d="m-80 620 670-770M310 770l670-770M700 830l670-770" stroke="#fff" stroke-width="12" opacity=".12"/>
+  <text x="80" y="300" fill="#fff" font-family="Arial,sans-serif" font-size="45" font-weight="700">FaZe COMPETITIVE</text>
+  <text x="80" y="430" fill="#fff" font-family="Arial,sans-serif" font-size="95" font-weight="900">SMASH</text>
+  <text x="80" y="510" fill="#fff" font-family="Arial,sans-serif" font-size="30">ULTIMATE DIVISION</text>
+</svg>

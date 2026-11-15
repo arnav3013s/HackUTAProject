@@ -5,7 +5,7 @@ const gameArt = {
   "r6": "https://cdn.wccftech.com/wp-content/uploads/2025/03/Rainbow-Six-Siege-X-scaled.jpg",
   "pubg": "https://image.api.playstation.com/vulcan/ap/rnd/202405/1408/38d76731861cb22eda6417471d0f60fd4ae56d418fbeb840.png",
   "halo": "https://cdn.akamai.steamstatic.com/steam/apps/1240440/library_hero.jpg",
-  "smash": "https://bfasset.costco-static.com/U447IH35/as/5mxjvxmmf37bgp55x664k76/4000380676-847__1?auto=webp&canvas=1024%2C1024&fit=bounds&format=jpg&height=1024&width=1024",
+  "smash": "/images/games/smash.svg",
   "apex": "https://cdn.akamai.steamstatic.com/steam/apps/1172470/library_hero.jpg",
   "rocket": "https://image.api.playstation.com/vulcan/ap/rnd/202009/0323/7Cwm55w1Sf7UgZwARdoi6eQC.png",
   "valorant": "https://media.altchar.com/prod/images/original/gm-529b584b-80b1-423f-8125-fd35b39f9651-valorant-key-art-final.jpg",
@@ -91,5 +91,5 @@ export const updates = [
   {type:'stream',title:'CDL Kickoff broadcasts',label:'DEC 4–13, 2026 · OFFICIAL CDL STREAM',summary:'The league opens on December 4. See the CDL schedule for match times and tune in to its official live broadcasts.',url:'https://www.youtube.com/@CODLeague/streams'},
   {type:'stream',title:'FaZe on Twitch',label:'OFFICIAL STREAM CHANNEL',summary:'Follow the channel for alerts and browse recent broadcasts. Check Twitch for the current live status.',url:'https://www.twitch.tv/faze'},
   {type:'stream',title:'ZooMaa Live',label:'THE FLANK · TWITCH',summary:'Follow ZooMaa for tournament co-streams, Call of Duty and The Flank.',url:'https://www.twitch.tv/zoomaa'},
-  ytVideo('rACwtbTSqwE','How FaZe won Antwerp','ARCHIVE · FAZE ESPORTS','The story behind the Counter-Strike Major trophy.')
+  ytVideo('rACwtbTSqwE','How FaZe won Antwerp','ARCHIVE · FaZe ESPORTS','The story behind the Counter-Strike Major trophy.')
 ];

@@ -31,8 +31,25 @@ export function publicQuiz({ correct, ...question }, reveal) {
 }
 
 const isDaily = id => /^(daily|check-in|trivia):/.test(id);
-const isPassive = id => /^(demo$|referral:|review:)/.test(id);
+const isPassive = id => /^(demo$|referral:|review:|returning-loyalty$)/.test(id);
 export const dailyDates = user => [...new Set(user.ledger.filter(item => isDaily(item.id)).map(item => item.id.split(':')[1]))].sort();
+export function weekStart(now = Date.now()) {
+  const date = new Date(now);
+  const weekday = (date.getUTCDay() + 6) % 7;
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - weekday)).toISOString().slice(0, 10);
+}
+export function weeklyProgress(user, now = Date.now()) {
+  const week = weekStart(now);
+  const dailyDays = user?.ledger.filter(item => item.id.startsWith('completion:') && item.id.slice(11) >= week).length || 0;
+  const clips = new Set((user?.watchedClips || []).filter(item => item.at.slice(0, 10) >= week).map(item => item.id)).size;
+  const referrals = user?.ledger.filter(item => item.id.startsWith('referral:') && item.at.slice(0, 10) >= week).length || 0;
+  const tasks = [
+    { id: 'daily', name: 'Finish daily tasks on four days', progress: dailyDays, goal: 4 },
+    { id: 'clips', name: 'Explore three different highlights', progress: clips, goal: 3 },
+    { id: 'squad', name: 'Bring back your squad', progress: referrals, goal: 1 }
+  ].map(task => ({ ...task, claimed: Boolean(user?.ledger.some(item => item.id === `weekly:${week}:${task.id}`)) }));
+  return { week, tasks, chestReady: tasks.filter(task => task.claimed).length >= 2, chestClaimed: Boolean(user?.ledger.some(item => item.id === `weekly-chest:${week}`)) };
+}
 export function referralMilestones(user, now = Date.now()) {
   return { age: Math.max(0, Math.floor((now - user.created) / day)), tasks: dailyDates(user).length };
 }
@@ -42,8 +59,10 @@ export function engagement(user, now = Date.now(), profile) {
   const cards = [
     { id: 'check-in', name: 'Daily check-in', points: rewardRules.checkIn },
     { id: 'trivia', name: 'Archive trivia', points: rewardRules.trivia },
-    { id: 'daily', name: 'Meta pick', points: rewardRules.daily }
-  ].map(card => ({ ...card, done: Boolean(user?.ledger.some(item => item.id === `${card.id}:${date}`)) }));
+    { id: 'daily', name: 'Meta pick', points: rewardRules.daily },
+    { id: 'watch-task', name: 'Watch a highlight', points: rewardRules.watch }
+  ].filter(card => card.id !== 'daily' || !user || now - user.created < rewardRules.days * day)
+    .map(card => ({ ...card, done: Boolean(user?.ledger.some(item => item.id === `${card.id}:${date}`)) }));
   const quiz = publicQuiz(dailyQuiz(now), cards[1].done);
   if (!user) return { date, cards, quiz, starter: publicQuiz(starterQuiz, false) };
   profile ??= gameProfile(user, now);
@@ -55,8 +74,8 @@ export function engagement(user, now = Date.now(), profile) {
   const daysAway = Math.max(0, Math.floor((now - lastActivity) / day));
   const started = actions.length > 0 || Boolean(user.matches?.length || user.lastReviewAt);
   const stage = !started ? 'new' : daysAway >= returnAfterDays ? 'returning' : 'active';
-  const reason = stage === 'returning' ? `Your last Afterimage activity was ${daysAway} days ago.`
-    : stage === 'active' ? `You recorded Afterimage activity in the last ${returnAfterDays} days.`
+  const reason = stage === 'returning' ? `Your last Clan activity was ${daysAway} days ago.`
+    : stage === 'active' ? `You recorded Clan activity in the last ${returnAfterDays} days.`
     : 'Your profile is ready for its first mission.';
   const preferences = (user.favoriteGames || []).filter(game => games.includes(game));
   const primaryGame = profile[0]?.game || preferences[0] || Object.keys(user.links)[0] || null;
@@ -80,7 +99,9 @@ export function engagement(user, now = Date.now(), profile) {
     : starterDone ? 'You completed the first ILLCAMS challenge and earned your archive points.' : '';
   return {
     date, cards, quiz, stage, reason, daysAway, preferences, primaryGame, lastActivity, streak, comeback, comebackActivity, rewind,
-    starterDone, starter: publicQuiz(starterQuiz, starterDone), onboardingDone: Boolean(user.onboardingDone)
+    starterDone, starter: publicQuiz(starterQuiz, starterDone), onboardingDone: Boolean(user.onboardingDone),
+    watchedToday: Boolean(user.watchedClips?.some(item => item.at.slice(0, 10) === date)),
+    completionDone: Boolean(user.ledger.some(item => item.id === `completion:${date}`))
   };
 }
 
@@ -93,7 +114,7 @@ export function addNotice(user, notice, now = Date.now()) {
 export function syncNotices(user, now = Date.now()) {
   const status = engagement(user, now, []);
   if (!user.welcomed) {
-    addNotice(user, { id: 'welcome', title: 'Welcome to Afterimage', message: 'Pick your games and earn your first points in the walkthrough.', route: '#welcome' }, now);
+    addNotice(user, { id: 'welcome', title: 'Welcome to Clan', message: 'Pick your games and earn your first points in the walkthrough.', route: '#welcome' }, now);
     user.welcomed = true;
   }
   if (status.stage === 'returning') {
@@ -104,7 +125,7 @@ export function syncNotices(user, now = Date.now()) {
       id: `return-${utcDate(status.lastActivity)}`, kind: 'returning',
       title: status.comeback ? `Your ${status.comeback}-point comeback is ready` : 'Your daily missions are ready',
       message: status.comeback ? `Your last activity was ${status.daysAway} days ago. Claim your comeback and see today’s missions.`
-        : `It’s been ${status.daysAway} days since your last Afterimage activity. Come back for today’s check-in and archive question.`,
+        : `It’s been ${status.daysAway} days since your last Clan activity. Come back for today’s check-in and archive question.`,
       route: '#missions',
       email: true
     }, now);
@@ -150,8 +171,8 @@ export async function deliverNotices(store, origin, now = Date.now()) {
       const unsubscribe = `${origin}/mail/unsubscribe?token=${user.unsubscribeToken}`;
       const message = delivery.message ||= {
         from: process.env.REPLAY_EMAIL_FROM, to: [user.email],
-        subject: `FaZe Replay · ${candidate.title}`,
-        text: `${candidate.message}\n\nOpen Replay: ${origin}/${candidate.route}\n\nUnsubscribe: ${unsubscribe}`,
+        subject: `FaZe Clan · ${candidate.title}`,
+        text: `${candidate.message}\n\nOpen FaZe Clan: ${origin}/${candidate.route}\n\nUnsubscribe: ${unsubscribe}`,
         headers: { 'List-Unsubscribe': `<${unsubscribe}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
       };
       batches.push({ id, notice: candidate.id, tries: delivery.tries, message });

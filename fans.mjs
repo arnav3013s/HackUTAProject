@@ -74,68 +74,79 @@ export function fanCategory(user, now = Date.now(), profile = gameProfile(user, 
 export function fanWallet(user) {
   let earned = 0;
   let spent = 0;
-  for (const { points } of user.ledger) {
-    if (points >= 0) earned += points;
-    else spent -= points;
-  }
-  return { earned, spent, balance: earned - spent };
-}
-
-export function seedFans(state, log, now = Date.now()) {
-  if (state.fanLabSeed === 1) return;
-  const names = ['Ash', 'Blake', 'Casey', 'Devon', 'Ellis', 'Frankie', 'Gray', 'Harper'];
-  const surname = ['Vale', 'Cruz', 'Park', 'Reed', 'Stone', 'Wells', 'Fox'];
-  for (let group = 0; group < categories.length; group++) {
-    for (let index = 0; index < names.length; index++) {
-      const id = `fan-${group + 1}-${index + 1}`;
-      const created = now - ((group === 2 ? 28 : group === 0 ? 1 : 11) + index) * day;
-      const recent = now - (group === 2 ? 9 + index : 1) * day;
-      const game = group === 2 ? games[0] : games[(index + group) % games.length];
-      const user = {
-        id, name: `${names[index]} ${surname[group]}`, created, demo: true, persona: true,
-        invite: `LAB-${group + 1}${index + 1}`, ledger: [],
-        links: group === 0 ? {} : { [game]: { handle: `${names[index]}_${index + group * 10}`, verified: false } }
-      };
-      state.users[id] = user;
-      const add = (id, label, points, ts, kind = 'points') => {
-        user.ledger.push({ id, label, points, at: new Date(ts).toISOString() });
-        log({ kind, subject: user.id, amount: points, time: new Date(ts).toISOString(), sample: true });
-      };
-      add('demo', 'Starter demo points', rewardRules.demoBalance, created);
-      const picks = group === 1 ? 3 + index : group === 0 ? 0 : group === 6 ? 1 : index % 3;
-      for (let pick = 0; pick < picks; pick++) {
-        const when = recent - pick * day;
-        add(`daily:${new Date(when).toISOString().slice(0, 10)}`, 'Daily meta pick', rewardRules.daily, when);
-      }
-      if (group === 3) {
-        add('redeem:seed', 'Intel Pass', -80, recent, 'redeem');
-        const orderId = `${id}:seed`;
-        state.redemptions[orderId] = { id: orderId, user: id, product: 'pass', name: 'Intel Pass', status: 'activated' };
-      }
-      if (group === 4) {
-        for (let referral = 0; referral <= index % rewardRules.referralCap; referral++) {
-          add(`referral:seed-${referral}`, 'Approved referral', rewardRules.referral, recent);
-        }
-      }
-      if (group === 5) add('review:seed', 'Accepted CS2 survey', rewardRules.review, recent);
-      for (let open = 0; open < (group === 0 ? 1 : 2 + index % 3); open++) {
-        const clip = videos[(group + open + index * 2) % videos.length];
-        const time = new Date(recent - open * 8 * day).toISOString();
-        if (Date.parse(time) >= created) log({ kind: 'clip', subject: clip.id, amount: 1, time, sample: true });
+  const credits = [];
+  for (const { points, expiresAt, at } of user.ledger) {
+    if (points >= 0) { earned += points; credits.push({ remaining: points, expiresAt }); }
+    else {
+      spent -= points;
+      let needed = -points;
+      for (const credit of credits) {
+        if (credit.expiresAt && Date.parse(credit.expiresAt) <= Date.parse(at)) continue;
+        const used = Math.min(needed, credit.remaining);
+        credit.remaining -= used;
+        needed -= used;
+        if (!needed) break;
       }
     }
   }
-  state.fanLabSeed = 1;
+  const now = Date.now();
+  const expired = credits.reduce((sum, item) => sum + (item.expiresAt && Date.parse(item.expiresAt) <= now ? item.remaining : 0), 0);
+  return { earned, spent, expired, balance: credits.reduce((sum, item) => sum + item.remaining, 0) - expired };
+}
+
+export function seedFans(state, log, now = Date.now()) {
+  if (state.fanLabSeed === 3) return;
+  const removed = new Set(Object.values(state.users).filter(user => user.demo).map(user => user.id));
+  for (const id of removed) delete state.users[id];
+  for (const [key, session] of Object.entries(state.sessions)) if (removed.has(session.user)) delete state.sessions[key];
+  for (const [id, redemption] of Object.entries(state.redemptions)) if (removed.has(redemption.user)) delete state.redemptions[id];
+  for (const [id, referral] of Object.entries(state.referrals)) if (removed.has(referral.inviter) || removed.has(referral.invitee)) delete state.referrals[id];
+  const personas = [
+    { name: 'Regular User', type: 'Normal User', age: 45, game: games[0] },
+    { name: 'New User', type: 'New User', age: 1, game: null },
+    { name: 'Old Returning User', type: 'Returning User', age: 400, game: games[0] },
+    { name: 'Pro Streamer', type: 'Streamer', age: 100, game: games[0] }
+  ];
+  personas.forEach((persona, index) => {
+    const id = `fan-${index + 1}-1`;
+    const created = now - persona.age * day;
+    const user = { id, name: persona.name, created, demo: true, persona: true,
+      personaType: persona.type, invite: `LAB-${index + 1}1`, ledger: [],
+      links: persona.game ? { [persona.game]: { handle: `demo_${index + 1}`, verified: false } } : {},
+      ...(persona.type === 'Streamer' ? { profile: { game: persona.game, specialty: 'Demo creator', description: 'Sample profile' } } : {}) };
+    state.users[id] = user;
+    const add = (entry, label, points, at) => {
+      const time = new Date(at).toISOString();
+      user.ledger.push({ id: entry, label, points, at: time });
+      log({ kind: 'points', subject: id, amount: points, time, sample: true });
+    };
+    add('demo', 'Starter demo points', rewardRules.demoBalance, created);
+    if (persona.type === 'Returning User') {
+      for (let dayIndex = 0; dayIndex < 6; dayIndex++) {
+        const at = created + (dayIndex + 1) * day;
+        add(`daily:${new Date(at).toISOString().slice(0, 10)}`, 'Historical daily activity', rewardRules.daily, at);
+      }
+      const contributionDays = user.ledger.filter(entry => entry.id.startsWith('daily:')).length;
+      add('returning-loyalty', 'Return bonus based on past contribution days', 20 + Math.min(30, contributionDays * 5), now);
+      user.fanSinceYear = 2015;
+    }
+    if (persona.type === 'Streamer') add('review:seed', 'Sample accepted creator survey', rewardRules.review, now - day);
+    const clip = videos[index % videos.length];
+    log({ kind: 'clip', subject: clip.id, amount: 1, time: new Date(now - day).toISOString(), sample: true });
+  });
+  state.fanLabSeed = 3;
+  state.matchProfilesSeeded = false;
 }
 
 export function seedMatchProfiles(state, log) {
+  const now = Date.now();
   for (const fan of Object.values(state.users)) {
     if (!fan.persona || fan.matches) continue;
     const [, cohort, number] = fan.id.split('-').map(Number);
     const primary = Object.keys(fan.links)[0] || games[number % games.length];
     const second = games[(games.indexOf(primary) + 1 + number % (games.length - 1)) % games.length];
-    const lastMatch = cohort === 3 ? fan.created + (16 - number) * day : fan.created + (cohort === 1 ? 0 : 9) * day;
-    const count = cohort === 1 ? (number - 1) % 3 : 3 + (number % 5);
+    const lastMatch = fan.personaType === 'Returning User' ? now - 14 * day : now - day;
+    const count = fan.personaType === 'New User' ? 0 : fan.personaType === 'Normal User' ? 2 : 3 + (number % 5);
     fan.matches = Array.from({ length: count }, (_, index) => {
       const fieldSize = [8, 12, 16][(index + cohort) % 3];
       const at = new Date(Math.max(fan.created, lastMatch - index * day)).toISOString();

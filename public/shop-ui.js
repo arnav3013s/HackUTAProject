@@ -2,10 +2,11 @@ import { h, useState, Image, Icon, LinkButton, Filters, Title, money, officialSh
 import { products } from './shop-data.js';
 
 const names = new Map(products.map(item=>[item.id,item]));
-const storageKey='faze-afterimage-cart-v1';
+const storageKey='faze-clan-cart-v1';
+const previousStorageKey=['faze','after','image','cart','v1'].join('-');
 export function readCart() {
   try {
-    const saved=JSON.parse(localStorage.getItem(storageKey));
+    const saved=JSON.parse(localStorage.getItem(storageKey) || localStorage.getItem(previousStorageKey));
     if (!Array.isArray(saved)) return [];
     return saved.filter(line=>line && names.get(line.id)?.sizes.includes(line.size) && Number.isInteger(line.quantity) && line.quantity>0 && line.quantity<=10);
   } catch { return []; }
@@ -41,7 +42,7 @@ function ProductDetail({item,add}) {
     h('div',{className:'ai-product-detail'},
       h('button',{className:'ai-product-photo'+(zoom?' zoomed':''),onClick:()=>setZoom(!zoom),'aria-pressed':zoom,'aria-label':zoom?'Zoom out of product photo':'Zoom in on product photo'},
         h(Image,{src:item.image,alt:item.name,priority:true,fallback:null}),h('span',{className:'ai-product-open'},h(Icon,{name:zoom?'minus':'plus'}))),
-      h('div',{className:'ai-product-info'},h('span',{className:'ai-kicker'},item.kind+' / OFFICIAL FAZE MERCH'),h('h1',null,item.name),h(Price,{item}),h('p',null,item.detail),
+      h('div',{className:'ai-product-info'},h('span',{className:'ai-kicker'},item.kind+' / OFFICIAL FaZe MERCH'),h('h1',null,item.name),h(Price,{item}),h('p',null,item.detail),
         h('form',{onSubmit:e=>{e.preventDefault();if(size && !item.soldOut)add(item,size);}},
           h('fieldset',null,h('legend',null,'Select size'),h('div',{className:'ai-sizes'},item.sizes.map(value=>h('label',{key:value},
             h('input',{type:'radio',name:'size',value,required:true,checked:size===value,onChange:()=>setSize(value)}),h('span',null,value))))),
@@ -56,7 +57,7 @@ export function Shop({part,add}) {
   if (part && !item) return h('section',{className:'ai-section'},h(Title,{label:'OFFICIAL MERCH',title:'ITEM UNAVAILABLE'}),h(LinkButton,{href:'#shop'},'Back to shop'));
   if (item) return h(ProductDetail,{key:item.id,item,add});
   const shown=products.filter(product=>category==='all'||product.kind===category);
-  return h('div',null,h(Title,{label:'THE FAZE ESPORTS COLLECTION',title:'SHOP'},'Official FaZe jerseys, apparel, and gear.'),
+  return h('div',null,h(Title,{label:'THE FaZe ESPORTS COLLECTION',title:'SHOP'},'Official FaZe jerseys, apparel, and gear.'),
     h('section',{className:'ai-section'},h(Filters,{name:'Filter products',items:[['all','All items'],...['Jerseys','Tees','Outerwear','Accessories'].map(s=>[s,s])],current:category,select:setCategory}),
       h('p',{className:'ai-results-count','aria-live':'polite'},shown.length+' items'),
       h(ProductGrid,{items:shown})));

@@ -12,7 +12,9 @@ export function Icon({ name, size = 19 }) {
     copy: 'M8 8h12v12H8zM16 8V4H4v12h4', plus: 'M12 5v14M5 12h14', minus: 'M5 12h14',
     instagram: 'M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4Zm9 9a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm2-5h.01',
     twitter: 'M4 4h4l12 16h-4L4 4Zm16 0L4 20', twitch: 'M4 3h17v12l-5 5h-4l-3 3v-3H4V3Zm7 5v5m5-5v5',
-    youtube: 'M3 7c0-2 2-3 9-3s9 1 9 3v10c0 2-2 3-9 3s-9-1-9-3V7Zm7 1 6 4-6 4V8Z'
+    youtube: 'M3 7c0-2 2-3 9-3s9 1 9 3v10c0 2-2 3-9 3s-9-1-9-3V7Zm7 1 6 4-6 4V8Z',
+    sun: 'M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',
+    moon: 'M20.4 15.3A8.5 8.5 0 0 1 8.7 3.6 8.5 8.5 0 1 0 20.4 15.3Z'
   };
   return h('svg', { viewBox:'0 0 24 24', width:size, height:size, fill:'none', stroke:'currentColor', strokeWidth:1.55, strokeLinecap:'round', strokeLinejoin:'round', 'aria-hidden':true }, h('path',{d:paths[name]}));
 }
@@ -29,12 +31,12 @@ export function Title({ label, title, children }) {
   return h('div',{className:'ai-page-head'},h('div',{className:'ai-kicker'},label),h('h1',null,title),children && h('p',null,children));
 }
 
-export function Image({ src, alt = '', priority = false, fallback = '/art/stage.jpg', ...props }) {
+export function Image({ src, alt = '', priority = false, fallback = '/images/media-placeholder.svg', ...props }) {
   return h('img',{src,alt,loading:priority ? 'eager' : 'lazy',decoding:'async',fetchpriority:priority ? 'high' : undefined,
-    onError:event=>{if (fallback && !event.currentTarget.dataset.fallback) {
+    onError:event=>{if (!event.currentTarget.dataset.fallback) {
       event.currentTarget.dataset.fallback = 'true';
-      event.currentTarget.src = fallback;
-    }},...props});
+      event.currentTarget.src = fallback || '/images/media-placeholder.svg';
+    } else event.currentTarget.style.visibility = 'hidden';},...props});
 }
 
 export function Filters({ items, current, select, name }) {
