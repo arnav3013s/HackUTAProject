@@ -20,11 +20,20 @@ if /i "%~1"=="--check" (
   exit /b 0
 )
 
+if not defined PORT set "PORT=4175"
+set "HOST=127.0.0.1"
+set "PUBLIC_ORIGIN=http://127.0.0.1:%PORT%"
+if not defined DEMO_MODE set "DEMO_MODE=1"
+
 echo Starting FaZe Clan...
-echo Open http://localhost:4173 after the server says it is ready.
+echo Open the URL shown on the "FaZe Clan ready" line.
 echo Keep this window open while using the site. Press Ctrl+C to stop.
 echo.
-"%CLAN_NODE%" --env-file-if-exists=.env server.mjs
+if exist ".env" (
+  "%CLAN_NODE%" --env-file-if-exists=.env server.mjs
+) else (
+  "%CLAN_NODE%" server.mjs
+)
 set "CLAN_EXIT=%errorlevel%"
 if not "%CLAN_EXIT%"=="0" pause
 popd

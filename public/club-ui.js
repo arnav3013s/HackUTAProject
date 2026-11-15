@@ -5,6 +5,8 @@ const h = createElement;
 export function Icon({ name, size = 19 }) {
   const paths = {
     arrow: 'M4 12h15m-6-6 6 6-6 6', diagonal: 'M6 18 18 6M7 6h11v11',
+    star: 'm12 3 2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6-4.3-4.2 6-.9L12 3Z',
+    globe: 'M22 12a10 10 0 1 0-20 0 10 10 0 0 0 20 0ZM2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20',
     down: 'm6 9 6 6 6-6', close: 'M6 6l12 12M18 6 6 18',
     menu: 'M4 7h16M4 12h16M4 17h16', person: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2m12-14a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z',
     cart: 'M4 8h16l1 13H3L4 8Zm4 2V6a4 4 0 1 1 8 0v4', play: 'm8 5 12 7-12 7V5Z',

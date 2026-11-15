@@ -6,3 +6,5 @@ node_modules
 *.test.mjs
 .local-node/
 .local-media/
+!public/data/
+!public/data/passport.js

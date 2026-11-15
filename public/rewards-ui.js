@@ -1,3 +1,4 @@
+import { CreatorCodeField, MyFaze } from './program-ui.js';
 import { h, useState, useRef, Image, Icon, LinkButton, SectionTitle, Title, number, date } from './club-ui.js';
 
 function Totals({user}) {
@@ -39,7 +40,7 @@ function Redeem({data,user,perform}) {
     h('form',{className:'creator-code-form',onSubmit:async event=>{
       event.preventDefault();const ok=await perform('creator',{code:code.trim()});
       setCodeStatus(ok?'Creator code applied. You are entered in this creator’s eligible giveaway.':'Invalid or unavailable creator code. Check the spelling and your account eligibility.');
-    }},h('label',null,'Apply a Creator Code',h('input',{value:code,onChange:event=>setCode(event.target.value),maxLength:60,required:true,disabled:Boolean(user.creator),placeholder:'Enter creator code'})),
+    }},h(CreatorCodeField,{title:'Apply a Creator Code',value:code,onChange:event=>setCode(event.target.value),required:true,disabled:Boolean(user.creator)}),
       h('button',{className:'ai-button solid',disabled:Boolean(user.creator)},'Apply'),
       h('p',{role:'status'},user.creator?'Applied: '+user.creator:codeStatus)),
     h('div',{className:'ai-reward-grid'},data.products.map(item=>{
@@ -148,6 +149,7 @@ export function Rewards({part,data,openAuth,perform,notify}) {
   const active=['redeem','points-shop'].includes(part)?'redeem':part==='history'?'history':'earn';
   return h('div',null,h(Title,{label:'YOUR FAN WALLET',title:'REWARDS'},'Earn points through challenges and referrals. Use them to unlock rewards.'),
     h('section',{className:'ai-section ai-rewards'},
+      h(MyFaze,{user}), h('div',{className:'clan-program-nav'},h(LinkButton,{href:'/drops',kind:'outline'},'Limited drops'),h(LinkButton,{href:'/next',kind:'outline'},'FaZe NEXT')),
       !user?h('div',{className:'ai-empty'},h('h2',null,'Sign in to open your wallet'),h('p',null,'Your points, referrals, and reward history are saved with your account.'),
         h('button',{className:'ai-button solid',onClick:()=>openAuth('signup')},'Create account',h(Icon,{name:'arrow'})),h('button',{className:'ai-button outline',onClick:()=>openAuth('login')},'Log in')) :
       h('div',null,h('nav',{className:'ai-reward-tabs','aria-label':'Reward views'},[['earn','Earn points'],['redeem','Redeem points'],['history','Points history']].map(([key,label])=>h('a',{key,href:'#rewards/'+key,'aria-current':key===active?'page':undefined},label))),

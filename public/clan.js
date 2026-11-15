@@ -6,22 +6,30 @@ import { Shop, Cart, readCart, saveCart, updateCart } from './shop-ui.js';
 import { Teams } from './teams-page.js';
 import { About } from './about-page.js';
 import { PlayerProfile } from './player-page.js';
-import { FloatingAssistant, Tour } from './floating.js';
+import { Tour } from './floating.js';
+import { FloatingAssistant } from './ask-faze-client.js';
+import { HouseMenu, HouseNavigation, HousePage, HouseFooter, housePages } from './house.js';
+import { AuthForm, BrandLogo, SideAuth, WelcomeOffer } from './fan-auth.js';
+import { PatchIntel } from './patch-intel.js';
+import { DropCheckout, DropsPage, MyFaze, OgPage, PassportPage } from './program-ui.js';
+import { NextPage } from './next-ui.js';
 
-const simpleLinks = [['home','Home'],['about','About Us'],['clan','Clan'],['news','News'],['esports','Esports'],['teams','Teams'],['gallery','Gallery'],['shop','Shop'],['rewards','Rewards']];
-const extraLinks = [['fanlab','Fan Lab'],['watch','Video archive'],['patches/pro-reviews','Patch intel'],['performance','Match activity'],['inbox','Inbox'],['tracks','MLH tracks']];
+const simpleLinks = [['home','Home'],['about','About Us'],['news','News'],['esports','Esports'],['teams','Teams'],['gallery','Gallery'],['house','FaZe House'],['shop','Shop'],['rewards','Rewards']];
+const extraLinks = [['fanlab','Fan Lab'],['watch','Video archive'],['patch-intel','Patch Intel'],['next','FaZe NEXT'],['performance','Match activity'],['inbox','Inbox'],['tracks','MLH tracks']];
+const compactNav = new Set(['news','teams','gallery']);
 const legacy = new Set(['account','ask','inbox','leaderboard','patches','performance','receipts','tracks','watch','welcome']);
-const linkFor = key => ['about','clan','teams'].includes(key) ? '/'+key : '/#'+key;
+const linkFor = key => ['about','clan','house','teams','patch-intel','passport','og','drops','next'].includes(key) ? '/'+key : '/#'+key;
 const inviteCode = () => new URLSearchParams(location.search).get('invite') || '';
 const saved = key => { try { return localStorage.getItem(key); } catch { return null; } };
 const save = (key,value) => { try { localStorage.setItem(key,value); } catch {} };
 const tourDoneKey = user => `faze-clan-tour-done-v2-${user?.id || 'guest'}`;
 function getPath() {
-  if (['/about','/teams','/clan','/terms','/privacy'].includes(location.pathname)) return location.pathname.slice(1);
+  if (['/about','/teams','/clan','/house','/terms','/privacy'].includes(location.pathname)) return location.pathname.slice(1);
+  if (/^\/(?:patch-intel|passport(?:\/[a-z0-9-]+)?|og(?:\/dashboard)?|drops(?:\/[a-z0-9-]+)?|next(?:\/[a-z0-9-]+(?:\/[a-z0-9-]+)?)?)$/.test(location.pathname)) return location.pathname.slice(1);
   if (/^\/players\/[a-z0-9-]+$/.test(location.pathname)) return location.pathname.slice(1);
   const hash = location.hash.slice(1);
   if (!hash || hash==='club-content' || hash==='content') return 'home';
-  const aliases = {missions:'rewards/earn',invites:'rewards/redeem','rewards/points-shop':'rewards/redeem','rewards/ledger':'rewards/history','rewards/receipts':'receipts',archive:'clan',fans:'fanlab'};
+  const aliases = {patches:'patch-intel',missions:'rewards/earn',invites:'rewards/redeem','rewards/points-shop':'rewards/redeem','rewards/ledger':'rewards/history','rewards/receipts':'receipts',archive:'clan',fans:'fanlab'};
   return Object.hasOwn(aliases,hash) ? aliases[hash] : hash;
 }
 
@@ -30,23 +38,28 @@ function Header({page,data,count,openAuth,theme,toggleTheme,replayTour}) {
   const [menu,setMenu]=useState('');
   useEffect(()=>{setMobile(false);setMenu('');},[page]);
   return h('header',{className:'ai-header'},
-    h('a',{className:'ai-brand',href:'/#home','aria-label':'FaZe Clan home'},h('img',{src:'/brand/logo.png',width:42,height:35,alt:''}),
+    h('a',{className:'ai-brand',href:'/#home','aria-label':'FaZe Clan home'},h(BrandLogo,{className:'header-brand-logo'}),
       h('span',null,h('small',null,'FaZe'),h('strong',null,'CLAN'))),
     h('button',{className:'ai-icon ai-mobile-toggle','aria-label':mobile?'Close menu':'Open menu','aria-expanded':mobile,onClick:()=>setMobile(!mobile)},h(Icon,{name:mobile?'close':'menu'})),
     h('nav',{className:'ai-nav'+(mobile?' opened':''),'aria-label':'Main navigation',onClick:e=>{if(e.target.closest('a')){setMobile(false);setMenu('');}},onKeyDown:e=>{if(e.key==='Escape'){setMobile(false);setMenu('');}}},
-      simpleLinks.map(([key,label])=>key==='esports'?
+      simpleLinks.map(([key,label])=>key==='house'?
+        h(HouseMenu,{key,page,mobile,open:menu==='house',setOpen:value=>setMenu(current=>value?'house':current==='house'?'':current)}) : key==='esports'?
         h('div',{key,className:'ai-nav-group'+(menu===key?' shown':'')},h('a',{href:linkFor(key),'aria-current':page===key?'page':undefined},label),
           h('button',{className:'ai-nav-arrow','aria-label':'List esports games','aria-expanded':menu===key,onClick:()=>setMenu(menu===key?'':key)},h(Icon,{name:'down',size:13})),
-          h('div',{className:'ai-nav-drop ai-esports-drop'},divisions.slice(0,6).map(game=>h('a',{key:game.key,href:'/#esports/'+game.key},game.name)))) :
-        h('a',{key,href:linkFor(key),'aria-current':page===key?'page':undefined},label)),
+          h('div',{className:'ai-nav-drop ai-esports-drop'},divisions.slice(0,6).map(game=>h('a',{key:game.key,className:'clan-menu-item',href:'/#esports/'+game.key,'aria-current':page==='esports'&&location.hash.endsWith('/'+game.key)?'page':undefined},game.name)))) :
+        h('a',{key,className:compactNav.has(key)?'nav-quiet nav-'+key:undefined,href:linkFor(key),'aria-current':page===key?'page':undefined},label)),
       h('div',{className:'ai-nav-group'+(menu==='more'?' shown':'')},h('button',{className:'ai-more','aria-expanded':menu==='more',onClick:()=>setMenu(menu==='more'?'':'more')},'More',h(Icon,{name:'down',size:13})),
-        h('div',{className:'ai-nav-drop'},extraLinks.map(([key,label])=>h('a',{key,href:linkFor(key)},label)),
-          h('button',{className:'ai-nav-action',onClick:()=>{replayTour();setMobile(false);}},'Replay tour'))),
+        h('div',{className:'ai-nav-drop'},
+          simpleLinks.filter(([key])=>compactNav.has(key)).map(([key,label])=>h('a',{key,className:'clan-menu-item nav-spill spill-'+key,href:linkFor(key),'aria-current':page===key?'page':undefined},label)),
+          extraLinks.map(([key,label])=>h('a',{key,className:'clan-menu-item',href:linkFor(key),'aria-current':page===key.split('/')[0]?'page':undefined},label)),
+          h('button',{className:'clan-menu-item',onClick:()=>{replayTour();setMobile(false);setMenu('');}},'Replay tour'))),
       h('button',{className:'ai-nav-action ai-mobile-theme',onClick:toggleTheme,'aria-label':theme==='dark'?'Switch to light mode':'Switch to dark mode'},h(Icon,{name:theme==='dark'?'sun':'moon'}),h('span',null,theme==='dark'?'Dark':'Light'))),
     h('div',{className:'ai-header-actions'},
       count>0&&h('a',{className:'ai-icon ai-cart-icon',href:'/#cart','aria-label':'Cart, '+count+' '+(count===1?'item':'items')},h(Icon,{name:'cart'}),h('span',null,count)),
       h('button',{className:'ai-icon ai-theme-toggle',onClick:toggleTheme,title:theme==='dark'?'Switch to light mode':'Switch to dark mode','aria-label':theme==='dark'?'Switch to light mode':'Switch to dark mode'},h(Icon,{name:theme==='dark'?'sun':'moon'})),
-      data?.user ? h('a',{className:'ai-account-link',href:'/#account','aria-label':'Account for '+data.user.name},h(Icon,{name:'person'}),h('span',null,number(data.user.balance)+' pts')) :
+      data?.user ? h('details',{className:'clan-account-menu',key:page},
+        h('summary',{className:'ai-account-link','aria-label':'Fan account'},h(Icon,{name:'person'}),h('span',null,number(data.user.balance)+' pts'),data.user.programs?.member&&h('span',{className:'clan-tag'},'OG')),
+        h('div',{className:'clan-account-popover'},h(MyFaze,{user:data.user,compact:true}),h('a',{className:'clan-menu-item',href:'/#account'},'Account settings'),h('a',{className:'clan-menu-item',href:'/og/dashboard'},'Membership dashboard'))) :
         h('button',{className:'ai-sign-in',onClick:()=>openAuth('login')},h(Icon,{name:'person',size:16}),'Log in')));
 }
 
@@ -62,7 +75,7 @@ function Footer({openAuth,notify}) {
   }
   return h('footer',{className:'ai-footer'},
     h('div',{className:'ai-footer-inner'},
-      h('div',{className:'ai-socials'},h('a',{href:'/#home',className:'ai-brand'},h('img',{src:'/brand/logo.png',alt:'',width:45,height:36}),h('strong',null,'FaZe CLAN')),
+      h('div',{className:'ai-socials'},h('a',{href:'/#home',className:'ai-brand'},h(BrandLogo,{className:'footer-brand-logo'}),h('strong',null,'FaZe CLAN')),
         h('div',{'aria-label':'FaZe social channels'},[
           ['instagram','Instagram','https://www.instagram.com/fazeclan/'],['twitter','X / Twitter','https://x.com/FaZeClan'],
           ['twitch','Twitch','https://www.twitch.tv/faze'],['youtube','YouTube','https://www.youtube.com/@FaZeClan']
@@ -71,40 +84,9 @@ function Footer({openAuth,notify}) {
         h('form',{onSubmit:subscribe},h('input',{type:'email',value:email,onChange:e=>setEmail(e.target.value),required:true,maxLength:254,autoComplete:'email',placeholder:'Email address','aria-label':'Email address for updates'}),
           h('button',{className:'ai-button solid',type:'submit',disabled:pending},pending?'Signing up…':'Sign up for updates')),
         h('button',{className:'ai-text-button',onClick:()=>openAuth('signup',email)},'Create a fan account',h(Icon,{name:'arrow',size:15})))),
+    h('div',{className:'ai-section house-footer-shell'},h(HouseFooter)),
     h('div',{className:'ai-footer-bottom'},h('span',null,'© FaZe Clan. All Rights Reserved.'),
       [['About Us','/about'],['Teams','/teams'],['Rewards','/#rewards'],['Store','/#shop'],['Contact','/about#contact'],['Terms of Service','/terms'],['Privacy Policy','/privacy']].map(([label,url])=>h('a',{key:label,href:url},label))));
-}
-
-function Auth({mode,setMode,initialEmail,close,data,finish}) {
-  const [pending,setPending]=useState(false);
-  const [error,setError]=useState('');
-  const [email,setEmail]=useState(initialEmail || '');
-  const [name,setName]=useState('');
-  const invite=inviteCode();
-  async function submit(action,fields) {
-    setError('');setPending(true);
-    try { const result=await api(action,fields);await finish(result.message); }
-    catch(e){setError(e.message);}
-    finally {setPending(false);}
-  }
-  return h(Modal,{label:'fan account',close,className:'ai-auth-modal'},
-    h('div',{className:'ai-auth-form'},
-      h('img',{src:'/brand/logo.png',alt:'',width:50,height:39}),h('span',{className:'ai-kicker'},'FaZe CLAN'),
-      h('h2',null,mode==='signup'?'CREATE ACCOUNT':'WELCOME BACK'),
-      invite && mode==='signup' && h('p',{className:'ai-invited'},'You’re joining through a referral link.'),
-      h('form',{key:mode,onSubmit:e=>{e.preventDefault();submit(mode,{...Object.fromEntries(new FormData(e.currentTarget)),invite});}},
-        mode==='signup'&&h('label',null,'Username',h('input',{name:'name',value:name,onChange:e=>setName(e.target.value),required:true,maxLength:40,autoComplete:'nickname'})),
-        h('label',null,'Email',h('input',{name:'email',type:'email',value:email,onChange:e=>setEmail(e.target.value),required:true,maxLength:254,autoComplete:'email'})),
-        h('label',null,'Password',h('input',{name:'password',type:'password',required:true,minLength:10,maxLength:128,autoComplete:mode==='signup'?'new-password':'current-password'})),
-        mode==='signup'&&h('p',{className:'ai-muted'},'Use at least 10 characters.'),
-        error&&h('p',{className:'ai-form-error',role:'alert'},error),
-        h('button',{className:'ai-button solid',type:'submit',disabled:pending},pending?'Please wait…':mode==='signup'?'Create account':'Log in',h(Icon,{name:'arrow'}))),
-      h('button',{className:'ai-text-button',onClick:()=>{setError('');setMode(mode==='signup'?'login':'signup');}},mode==='signup'?'Already have an account? Log in':'New here? Create an account'),
-      h('div',{className:'ai-auth-alternates'},data?.config.google ? h(LinkButton,{href:'/auth/google?invite='+encodeURIComponent(invite),kind:'outline',icon:null},'Continue with Google') :
-        h('button',{className:'ai-button outline',disabled:true,title:'Google sign-in needs server OAuth credentials'},'Continue with Google'),
-        data?.config.discord ? h(LinkButton,{href:'/auth/discord?invite='+encodeURIComponent(invite),kind:'outline',icon:null},'Continue with Discord') :
-        h('button',{className:'ai-button outline',disabled:true,title:'Discord sign-in needs server OAuth credentials'},'Continue with Discord'),
-        data?.config.demo&&h('button',{className:'ai-button outline',disabled:pending,onClick:()=>submit('demo',{invite,walkthrough:'1',name})},'Try a demo account'))));
 }
 
 function PersonaDemo({ user, theme }) {
@@ -176,7 +158,9 @@ function App() {
   const [tourMode,setTourMode]=useState(null);
   const [data,setData]=useState(null);
   const [error,setError]=useState('');
-  const [auth,setAuth]=useState(null);
+  const [auth,setAuth]=useState(()=>new URLSearchParams(location.search).has('reset')?'reset':null);
+  const [side,setSideState]=useState(()=>{try{return sessionStorage.getItem('faze-side-auth')==='open';}catch{return false;}});
+  const setSide=value=>{try{sessionStorage.setItem('faze-side-auth',value?'open':'closed');}catch{}setSideState(value);};
   const [email,setEmail]=useState('');
   const [video,setVideo]=useState(null);
   const [cart,setCart]=useState(readCart);
@@ -184,7 +168,7 @@ function App() {
   const toastTimer=useRef(null);
   const performLock=useRef(false);
   const initialRoute=useRef(true);
-  const [page,part]=path.split('/');
+  const [page,part,detail]=path.split('/');
   const usingLegacy=legacy.has(page);
   const count=cart.reduce((sum,item)=>sum+item.quantity,0);
 
@@ -194,7 +178,7 @@ function App() {
     document.querySelector('meta[name="theme-color"]').content=next==='light'?'#f6f6f7':'#0b0b0c';
     save('faze-clan-theme',next);setTheme(next);
   }
-  function replayTour(){setTourMode(data?.user?.accountType==='Returning User'?'returning':'full');}
+  function replayTour(){setSide(false);setTourMode(data?.user?.accountType==='Returning User'?'returning':'full');}
   function closeTour(){save(tourDoneKey(data?.user),'1');setTourMode(null);}
   function navigate(href){history.pushState(null,'',href);setPath(getPath());}
   function closeAuth(){save('faze-clan-auth-dismissed','1');setAuth(null);}
@@ -207,12 +191,13 @@ function App() {
   async function refresh() {
     const state=await api('state');setData(state);setError('');return state;
   }
-  function openAuth(mode,address=''){setEmail(address);setAuth(mode);}
+  function openAuth(mode,address=''){setSide(false);setEmail(address);setAuth(mode);}
   async function finishAuth(message) {
     await refresh();
     const url=new URL(location.href);url.searchParams.delete('invite');
     history.replaceState(null,'',url);
     setAuth(null);
+    setSide(false);
     save('faze-clan-auth-dismissed','1');
     if(page==='account') location.hash='home';
     notify(message);
@@ -238,13 +223,13 @@ function App() {
     window.addEventListener('popstate',onPop);
     window.addEventListener('clan:state',onLegacy);
     refresh().catch(e=>setError(e.message));
-    if(inviteCode() && getPath()==='home')openAuth('signup');
+    if(inviteCode() && !new URLSearchParams(location.search).has('reset') && getPath()==='home')openAuth('signup');
     return ()=>{window.removeEventListener('hashchange',onHash);window.removeEventListener('popstate',onPop);window.removeEventListener('clan:state',onLegacy);window.clearTimeout(toastTimer.current);};
   },[]);
   useEffect(()=>{
     if (!data) return;
-    if (!data.user && !saved('faze-clan-auth-dismissed') && !inviteCode()) setAuth('signup');
-    if (!saved(tourDoneKey(data.user))) setTourMode(data.user?.accountType==='Returning User'?'returning':'full');
+    if (!data.user && getPath()==='home' && !saved('faze-clan-auth-dismissed') && !inviteCode() && !new URLSearchParams(location.search).has('reset')) setAuth('signup');
+    if (getPath()==='home' && !saved(tourDoneKey(data.user))) setTourMode(data.user?.accountType==='Returning User'?'returning':'full');
     else setTourMode(null);
   },[Boolean(data),data?.user?.id]);
   useEffect(()=>{
@@ -257,7 +242,7 @@ function App() {
   },[]);
   useEffect(()=>{saveCart(cart);},[cart]);
   useEffect(()=>{
-    const title=page==='about'?'About FaZe Clan':(simpleLinks.find(([key])=>key===page)?.[1] || (page==='cart'?'Cart':page==='players'?'Player profile':'Fan hub'))+' | FaZe Clan';
+    const title=page==='about'?'About FaZe Clan':([...simpleLinks,...extraLinks,...housePages.map(item=>[item.route,item.name])].find(([key])=>key===page)?.[1] || (page==='cart'?'Cart':page==='players'?'Player profile':'Fan hub'))+' | FaZe Clan';
     document.title=title;
     const description=page==='about'?'Where gaming culture and competition collide. Explore FaZe Clan teams and championship history.':'Explore FaZe Clan teams, moments, rewards, and official merchandise.';
     document.querySelector('meta[name="description"]').content=description;
@@ -283,16 +268,23 @@ function App() {
     fanlab:()=>h(FanLabPage,{data,openAuth}),
     about:()=>h(About,{openAuth}),
     clan:()=>h(Clan,{data,play}),
+    house:()=>h(HousePage),
     teams:()=>h(Teams,{data}),
     players:()=>h(PlayerProfile,{slug:part,theme,data}),
-    terms:()=>h('section',{className:'ai-section'},h('h1',null,'Terms of Service'),h('p',null,'[ADD TERMS OF SERVICE]')),
-    privacy:()=>h('section',{className:'ai-section'},h('h1',null,'Privacy Policy'),h('p',null,'[ADD PRIVACY POLICY]')),
+    terms:()=>h('section',{className:'ai-section'},h('h1',null,'Terms of Service'),h('p',null,'[ADD TERMS OF SERVICE]'),h('h2',{id:'refunds'},'Refund policy'),h('p',null,'[ADD REFUND POLICY]')),
+    privacy:()=>h('section',{className:'ai-section'},h('h1',null,'Privacy Policy'),h('p',null,'[ADD PRIVACY POLICY]'),h('h2',{id:'ask-faze-privacy'},'Ask FaZe privacy'),
+      h('p',null,'Signed-in chats are saved to your account for the configured retention period. Guest conversations stay in your browser session. When Gemini is connected, it receives your question and a limited number of recent messages. Personal account answers stay on this site. Site operators can review reply ratings by topic. You can delete chats from the assistant.')),
     rewards:()=>h(Rewards,{part,data,openAuth,perform,notify}),
     esports:()=>h(Esports,{part,data,play}),
     gallery:()=>h(Gallery,{data,play}),
     news:()=>h(News,{data,play}),
     shop:()=>h(Shop,{part,add:(item,size)=>{change(item.id,size,1);notify(item.name+' · '+size+' added to cart.');}}),
-    cart:()=>h(Cart,{lines:cart,change})
+    cart:()=>h('div',null,h(DropCheckout,{data,notify,refresh}),h(Cart,{lines:cart,change})),
+    'patch-intel':()=>h(PatchIntel,{notify}),
+    passport:()=>h(PassportPage,{part,data,openAuth,notify,refresh}),
+    og:()=>h(OgPage,{part,data,openAuth,notify,refresh}),
+    drops:()=>h(DropsPage,{part,data,openAuth,notify,refresh}),
+    next:()=>h(NextPage,{part,detail,data,openAuth,notify,refresh})
   };
   return h('div',{className:'ai-app'},
     h(Header,{page,data,count,openAuth,theme,toggleTheme,replayTour}),
@@ -300,12 +292,15 @@ function App() {
       error && h('p',{className:'ai-global-error',role:'alert'},'Could not load fan data. ',error,' ',h('button',{className:'ai-text-button',onClick:()=>refresh().catch(e=>setError(e.message))},'Retry')),
       page==='account' && data?.user?.previewing && h(PersonaDemo,{user:data.user,theme}),
       h('div',{id:'legacy-main',className:'ai-legacy shell',hidden:!usingLegacy}),
+      h(HouseNavigation,{page}),
       !usingLegacy && (Object.hasOwn(content,page)?content[page]():h(NotFound))),
     h(Footer,{openAuth,notify}),
     toast&&h('div',{className:'ai-toast'+(toast.danger?' error':''),role:toast.danger?'alert':'status'},toast.message),
-    auth&&h(Auth,{mode:auth,setMode:setAuth,initialEmail:email,data,close:closeAuth,finish:finishAuth}),
-    video&&h(VideoModal,{clip:video,close:()=>setVideo(null)}),
-    h(FloatingAssistant),
+    auth&&h(Modal,{label:'fan account',close:closeAuth,className:'ai-auth-modal'},h(AuthForm,{mode:auth,setMode:setAuth,initialEmail:email,data,finish:finishAuth})),
+    page==='home'&&data&&!data.user&&!auth&&!tourMode&&h(SideAuth,{expanded:side,setExpanded:setSide,data,finish:finishAuth}),
+    page==='home'&&data?.user?.accountType==='Returning User'&&!auth&&!tourMode&&h('aside',{className:'clan-home-offer'},h(WelcomeOffer)),
+    video&&h(VideoModal,{key:video.id,clip:video,close:()=>setVideo(null),data,notify,refresh}),
+    h(FloatingAssistant,{blocked:Boolean(side||auth||tourMode||video),user:data?.user,onAction:kind=>{if(kind==='tour')replayTour();else openAuth(kind==='signup'?'signup':'login');}}),
     tourMode&&!auth&&h(Tour,{key:`${data?.user?.id || 'guest'}-${tourMode}`,mode:tourMode,close:closeTour,navigate}));
 }
 window.ReactDOM.createRoot(document.querySelector('#club-root')).render(h(App));

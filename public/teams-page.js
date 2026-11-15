@@ -88,5 +88,5 @@ export function Teams({ data }) {
       h('label', null, 'Find a player', h('input', { type: 'search', value: search, onChange: event => setSearch(event.target.value), placeholder: 'Search roster', 'aria-label': 'Search players by name' }))),
     shown.length ? shown.map(({ team, players }) => h(TeamRow, { key: team.slug, team, players, index: teams.indexOf(team), photos: data?.playerPhotos })) :
       h('p', { className: 'team-no-results' }, 'No current players match your search.'),
-    h('aside', { className: 'team-past' }, h('h2', null, 'Past Divisions'), h('p', null, pastDivisions.join(' · '))));
+    h('aside', { id: 'past-divisions', className: 'team-past' }, h('h2', null, 'Past Divisions'), h('p', null, pastDivisions.join(' · '))));
 }

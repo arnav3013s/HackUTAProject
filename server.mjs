@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
-import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
+import { once } from 'node:events';
+import { createHash, createHmac, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
@@ -9,18 +10,26 @@ import { faze } from './faze.mjs';
 import { openStore } from './store.mjs';
 import { analyze, clean, ensure, fetchJson, parsePatch, solanaRpc, tiers, verifyReceipt, vultrInstance } from './services.mjs';
 import { answerFan } from './assistant.mjs';
+import { chatFeedback, chatHistory, chatMessage, chatRate, chatRequest, chatUpdate, pruneChats } from './ask-faze.mjs';
 import { categories, day, fanCategory, fanWallet, gameProfile, matchCredit, seedFans, seedMatchProfiles } from './fans.mjs';
 import { rosters } from './rosters.mjs';
 import { addNotice, dailyQuiz, deliverNotices, engagement, inboxView, mailConfigured, referralMilestones, starterQuiz, syncNotices, utcDate, weeklyProgress } from './engagement.mjs';
 import { teams, photoPath } from './public/teams-data.js';
+import { activeMembership, applyStripeEvent, needsCaptcha, ogBilling, programMutation, programUser, programView, sendDropAlerts, verifyCaptcha, xpForPoints } from './programs.mjs';
+import { ogConfig } from './public/og-config.js';
 
 const scrypt = promisify(scryptCallback);
 const port = Number(process.env.PORT || 4173);
-const origin = new URL(process.env.PUBLIC_ORIGIN || `http://localhost:${port}`).origin;
+const host = process.env.HOST || '127.0.0.1';
+const originUrl = new URL(process.env.PUBLIC_ORIGIN || `http://localhost:${port}`);
+let origin = originUrl.origin;
 const homepageVideo = process.env.HERO_VIDEO_URL ||
   (existsSync(new URL('./public/hero.mp4', import.meta.url)) ? '/hero.mp4' : '/hero-placeholder.mp4');
 const secure = origin.startsWith('https:');
 const demo = process.env.DEMO_MODE === '1' || (process.env.DEMO_MODE !== '0' && !process.env.PUBLIC_ORIGIN);
+const loopback = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+const canUseFreePort = demo && loopback.has(host) && loopback.has(originUrl.hostname) && originUrl.protocol === 'http:' &&
+  Number(originUrl.port || 80) === port;
 const google = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 const discord = Boolean(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET);
 const operators = new Set((process.env.OPERATOR_EMAILS || '').toLowerCase().split(',').map(email => email.trim()).filter(Boolean));
@@ -67,8 +76,10 @@ const balance = user => fanWallet(user).balance;
 const credit = (user, id, label, points, log) => {
   ensure(!user.ledger.some(entry => entry.id === id), 'This reward has already been applied.', 409);
   const at = new Date().toISOString();
+  if (points > 0 && activeMembership(user)) points = Math.round(points * ogConfig.paid.pointsMultiplier);
   user.ledger.push({ id, label, points, at, ...(points > 0 ? { expiresAt: new Date(Date.now() + rewardRules.expiryDays * day).toISOString() } : {}) });
   log({ time: at, kind: points < 0 ? 'redeem' : 'points', subject: user.id, amount: points, sample: Boolean(user.demo) });
+  if (points > 0) xpForPoints(user, id);
 };
 function awardDailyCompletion(user, log) {
   const date = utcDate();
@@ -190,7 +201,7 @@ function publicState(data, user) {
     })),
     standings: leagueEntries.map(({ name, game, league, score }) => ({ name, game, league, score })),
     clips,
-    config: { demo, google, discord, email: mailConfigured(origin), gemini: Boolean(process.env.GEMINI_API_KEY), receiptAuthority: Boolean(process.env.SOLANA_RECEIPT_AUTHORITY), database: store.name, heroVideo: homepageVideo, memberVideo: Boolean(process.env.MEMBER_VIDEO_URL) }
+    config: { demo, google, discord, email: mailConfigured(origin), captcha: process.env.TURNSTILE_SITE_KEY || null, gemini: Boolean(process.env.GEMINI_API_KEY), receiptAuthority: Boolean(process.env.SOLANA_RECEIPT_AUTHORITY), database: store.name, heroVideo: homepageVideo, memberVideo: Boolean(process.env.MEMBER_VIDEO_URL) }
   };
   if (!user) return result;
   const owned = Object.values(data.redemptions).filter(order => order.user === user.id);
@@ -200,6 +211,7 @@ function publicState(data, user) {
   const returning = Date.now() - user.created >= rewardRules.minAge * day;
   return { ...result, user: {
     id: user.id, name: user.name, demo: Boolean(user.demo), verified: Boolean(user.googleSub), youtube: user.youtube,
+    programs: programUser(user),
     accountType: accountType(user), personaType: user.personaType || null, leaderboardOptIn: Boolean(user.leaderboardOptIn), weekly: weeklyProgress(user), era: fanEra(user),
     reviewer: isReviewer(user), operator: isOperator(user), links: user.links, invite: user.invite,
     ...fanWallet(user), category: fanCategory(user, Date.now(), profile), ledger: user.ledger, creator: user.creator,
@@ -442,26 +454,102 @@ function limit(req, scope, max) {
   }
 }
 
-async function readBody(req) {
-  ensure(req.headers['content-type']?.split(';')[0] === 'application/json', 'Send a JSON request.', 415);
+async function readBytes(req, max) {
   const chunks = [];
   let size = 0;
   for await (const chunk of req) {
     size += chunk.length;
-    ensure(size <= 100_000, 'Request exceeded the body size limit.', 413);
+    ensure(size <= max, 'Request exceeded the body size limit.', 413);
     chunks.push(chunk);
   }
+  return Buffer.concat(chunks);
+}
+
+async function readBody(req) {
+  ensure(req.headers['content-type']?.split(';')[0] === 'application/json', 'Send a JSON request.', 415);
+  const raw = await readBytes(req, 100_000);
   try {
-    const body = JSON.parse(Buffer.concat(chunks));
+    const body = JSON.parse(raw);
     ensure(body && typeof body === 'object' && !Array.isArray(body), 'Expected a JSON object.');
     return body;
   } catch { ensure(false, 'Malformed JSON.'); }
+}
+
+async function stripeWebhook(req) {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  ensure(secret, 'Stripe webhooks are unavailable.', 503);
+  const raw = await readBytes(req, 256_000);
+  const parts = String(req.headers['stripe-signature'] || '').split(',').map(part => part.trim().split('='));
+  const timestamp = parts.find(([key]) => key === 't')?.[1];
+  ensure(/^\d+$/.test(timestamp || '') && Math.abs(Date.now()/1000-Number(timestamp)) <= 300, 'Invalid Stripe signature timestamp.', 400);
+  const expected = createHmac('sha256', secret).update(timestamp + '.').update(raw).digest();
+  ensure(parts.some(([key, value]) => key === 'v1' && /^[a-f0-9]{64}$/i.test(value || '') && timingSafeEqual(Buffer.from(value,'hex'),expected)), 'Invalid Stripe signature.', 400);
+  let event;
+  try { event = JSON.parse(raw); } catch { ensure(false, 'Malformed Stripe event.'); }
+  ensure(event?.livemode === false && /^evt_[a-zA-Z0-9_]+$/.test(event.id) && typeof event.type === 'string' && Number.isFinite(event.created), 'Only signed Stripe test events are accepted.', 400);
+  await store.write(data => applyStripeEvent(data, event));
+  return { received: true };
+}
+
+async function passwordRecovery(req, action, body) {
+  limit(req, 'recovery', 5);
+  if (action === 'password-forgot') {
+    ensure(mailConfigured(origin), 'Email recovery is awaiting server mail configuration.', 503);
+    const email = clean(body.email, 254).toLowerCase();
+    ensure(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 'Enter a valid email.');
+    const raw = token();
+    const exists = await store.write(data => {
+      const user = Object.values(data.users).find(item => item.email === email && !item.demo && item.hash);
+      if (!user) return false;
+      data.recovery ||= {};
+      for (const [id, recovery] of Object.entries(data.recovery)) if (recovery.user === user.id || recovery.expires < Date.now()) delete data.recovery[id];
+      data.recovery[digest(raw)] = { user: user.id, expires: Date.now() + 30 * 60_000 };
+      return true;
+    });
+    if (exists) try {
+      await fetchJson('https://api.resend.com/emails', {
+        method: 'POST', signal: AbortSignal.timeout(8000),
+        headers: { Authorization: 'Bearer ' + process.env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: process.env.REPLAY_EMAIL_FROM, to: [email], subject: 'Reset your FaZe Clan password',
+          text: 'Open this link within 30 minutes to reset your password: ' + origin + '/?reset=' + raw })
+      });
+    } catch { console.warn('FaZe password recovery email could not be sent.'); }
+    return { message: 'If an account uses that email, a reset link is on its way.' };
+  }
+  const raw = clean(body.token, 50), password = body.password;
+  ensure(/^[\w-]{43}$/.test(raw) && typeof password === 'string' && password.length >= 10 && password.length <= 128, 'Use a valid reset link and a password of 10–128 characters.');
+  const salt = token(), hash = (await scrypt(password, salt, 64)).toString('hex');
+  await store.write(data => {
+    const id = digest(raw), recovery = data.recovery?.[id];
+    ensure(recovery?.expires > Date.now() && data.users[recovery.user], 'This reset link has expired.', 403);
+    Object.assign(data.users[recovery.user], { salt, hash });
+    delete data.recovery[id];
+    for (const [key, session] of Object.entries(data.sessions)) if (session.user === recovery.user) delete data.sessions[key];
+  });
+  return { message: 'Password updated. Log in with your new password.' };
 }
 
 async function mutate(req, res, action, key) {
   ensure(req.headers.origin === origin, 'Request origin does not match the site.', 403);
   limit(req, 'write', 150);
   const body = await readBody(req);
+  if (['password-forgot','password-reset'].includes(action)) return passwordRecovery(req, action, body);
+  if (/^(passport|og|drop|next)-/.test(action) && action !== 'og-quiz') {
+    limit(req, ['next-vote','passport-watch-start','passport-watch-finish'].includes(action) ? action : 'programs', action === 'next-sponsor' ? 5 : 65);
+    const data = await store.read();
+    const user = current(data, key);
+    if (['og-checkout','og-portal'].includes(action)) return ogBilling(action, origin, user, body);
+    const ip = req.socket.remoteAddress || '';
+    const risk = needsCaptcha(data, user, action, ip, body.device);
+    if (risk) await verifyCaptcha(body.captcha, ip);
+    return store.write((state, _record, log) => {
+      const active = current(state, key);
+      ensure(active?.id === user?.id, 'Your session changed. Sign in again.', 401);
+      ensure(risk || !needsCaptcha(state, active, action, ip, body.device), 'Complete the CAPTCHA and retry.', 403);
+      return programMutation({ data: state, user: active, body, action, demo, operator: isOperator(active), ip, risk,
+        credit: (player, id, label, points) => credit(player, id, label, points, log), clips: faze.videos });
+    });
+  }
   if (action === 'newsletter') {
     const email = clean(body.email, 254).toLowerCase();
     ensure(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 'Enter a valid email.');
@@ -580,22 +668,28 @@ async function mutate(req, res, action, key) {
     }
     const email = clean(body.email, 254).toLowerCase();
     const password = typeof body.password === 'string' ? body.password : '';
-    ensure(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && password.length >= 10 && password.length <= 128, 'Enter a valid email and a password of 10–128 characters.');
+    ensure(email && password.length >= 10 && password.length <= 128, 'Enter an email or username and a password of 10–128 characters.');
     if (action === 'signup') {
       const name = clean(body.name, 40);
-      ensure(name, 'Enter a display name.');
+      ensure(name && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 'Enter a username and valid email.');
       const salt = token();
       const hash = (await scrypt(password, salt, 64)).toString('hex');
       await startSession(res, (data, log) => {
         ensure(!Object.values(data.users).some(user => user.email === email), 'An account already uses that email.', 409);
-        const user = addUser(data, { email, name, salt, hash }, clean(body.invite, 20).toUpperCase(), current(data, key)?.id);
+        const handle = name.toLowerCase();
+        const useHandle = /^[a-z0-9][a-z0-9_-]{2,23}$/.test(handle);
+        ensure(!useHandle || !Object.values(data.users).some(item => item.passport?.handle === handle || String(item.name || '').toLowerCase() === handle), 'That username is taken.', 409);
+        const user = addUser(data, { email, name, salt, hash, adultConfirmed: body.adult === 'on' || body.adult === true,
+          ...(useHandle ? { passport: { handle } } : {}) }, clean(body.invite, 20).toUpperCase(), current(data, key)?.id);
         return user;
       }, key);
       return { message: 'Account created.' };
     }
-    const user = Object.values((await store.read()).users).find(item => item.email === email);
+    const accounts = Object.values((await store.read()).users).filter(item => !item.demo && (item.email === email ||
+      !email.includes('@') && (item.passport?.handle === email || String(item.name || '').toLowerCase() === email)));
+    const user = accounts.length === 1 ? accounts[0] : null;
     const check = await scrypt(password, user?.salt || 'patchline-missing-account', 64);
-    ensure(user?.hash && timingSafeEqual(Buffer.from(user.hash, 'hex'), check), 'Invalid email or password.', 401);
+    ensure(user?.hash && timingSafeEqual(Buffer.from(user.hash, 'hex'), check), 'Invalid email, username or password.', 401);
     await startSession(res, data => data.users[user.id], key);
     return { message: 'Signed in.' };
   }
@@ -881,11 +975,12 @@ const vendorFiles = {
   '/vendor/chart.js': ['chart.js/dist/chart.umd.js', 'chart.js@4.5.1/dist/chart.umd.js', 'text/javascript; charset=utf-8']
 };
 const assets ={ '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/style.css': ['style.css', 'text/css; charset=utf-8'], '/arena.png': ['arena.png', 'image/png'], '/hero.png': ['hero.png', 'image/png'], '/hero.mp4': ['hero.mp4', 'video/mp4'] };
-for (const file of ['club-bootstrap.js', 'clan.js', 'club-ui.js', 'club-pages.js', 'rewards-ui.js', 'shop-ui.js', 'gallery-data.js', 'esports-data.js', 'shop-data.js', 'teams-data.js', 'teams-page.js', 'about-data.js', 'about-page.js', 'player-page.js', 'floating.js']) {
+for (const file of ['club-bootstrap.js', 'clan.js', 'club-ui.js', 'club-pages.js', 'rewards-ui.js', 'shop-ui.js', 'gallery-data.js', 'esports-data.js', 'shop-data.js', 'teams-data.js', 'teams-page.js', 'about-data.js', 'about-page.js', 'player-page.js', 'floating.js', 'fan-auth.js', 'patch-intel.js', 'patch-intel-data.js', 'passport-config.js', 'og-config.js', 'drops-config.js', 'next-config.js', 'program-ui.js', 'next-ui.js', 'house.js', 'ask-faze-client.js', 'data/passport.js']) {
   assets['/' + file] = [file, 'text/javascript; charset=utf-8'];
 }
 assets['/clan.css'] = ['clan.css', 'text/css; charset=utf-8'];
 assets['/clan-features.css'] = ['clan-features.css', 'text/css; charset=utf-8'];
+assets['/clan-programs.css'] = ['clan-programs.css', 'text/css; charset=utf-8'];
 assets['/images/media-placeholder.svg'] = ['images/media-placeholder.svg', 'image/svg+xml'];
 assets['/images/games/smash.svg'] = ['images/games/smash.svg', 'image/svg+xml'];
 assets['/hero-placeholder.mp4'] = ['hero-placeholder.mp4', 'video/mp4'];
@@ -933,10 +1028,51 @@ const server = createServer(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Content-Security-Policy', `default-src 'self'; style-src 'self' https://cdn.jsdelivr.net; font-src 'self'; img-src 'self' https:; media-src 'self' https:; frame-src https://www.youtube-nocookie.com; script-src 'self' 'sha256-${inlineThemeHash}' https://cdn.jsdelivr.net; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`);
+  res.setHeader('Content-Security-Policy', `default-src 'self'; style-src 'self' https://cdn.jsdelivr.net; font-src 'self'; img-src 'self' https:; media-src 'self' https:; frame-src https://www.youtube-nocookie.com https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; script-src 'self' 'sha256-${inlineThemeHash}' https://cdn.jsdelivr.net https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`);
   try {
     const url = new URL(req.url, origin);
     const key = sessionKey(req);
+    if (req.method === 'POST' && url.pathname === '/api/stripe/webhook') return json(res, 200, await stripeWebhook(req));
+    if (url.pathname.startsWith('/api/ask-faze/')) {
+      const data = await store.read();
+      const user = current(data, key);
+      limit(req, 'ask-faze-api', 100);
+      if (req.method === 'GET' && url.pathname === '/api/ask-faze/chats') return json(res, 200, await chatHistory(store.chats, user));
+      if (req.method === 'GET' && url.pathname === '/api/ask-faze/feedback') {
+        ensure(user && isOperator(user) && !user.demo, 'Operator access required.', 403);
+        return json(res, 200, await chatFeedback(store.chats));
+      }
+      ensure(req.method === 'POST', 'Unknown Ask FaZe route.', 404);
+      ensure(req.headers.origin === origin, 'Request origin does not match the site.', 403);
+      const body = await readBody(req);
+      if (url.pathname === '/api/ask-faze/history') return json(res, 200, await chatUpdate(store.chats, user, body));
+      ensure(url.pathname === '/api/ask-faze/message', 'Unknown Ask FaZe route.', 404);
+      const request = chatRequest(body);
+      chatRate(req.socket.remoteAddress || '', user);
+      const abort = new AbortController();
+      res.once('close', () => abort.abort());
+      res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'X-Accel-Buffering': 'no' });
+      res.flushHeaders();
+      const send = (event, value) => {
+        if (!res.destroyed && !res.writableEnded) res.write('event: ' + event + '\n' + 'data: ' + JSON.stringify(value) + '\n\n');
+      };
+      try {
+        const reply = await chatMessage(store.chats, request, { user, data, demo }, { signal: abort.signal, onText: value => send('delta', value) });
+        if (reply) send('reply', reply);
+      } catch(error) {
+        if (!abort.signal.aborted) {
+          if(!error.status) console.warn('Ask FaZe request failed:', error.name);
+          send('error', { message:error.status ? error.message : 'Ask FaZe is temporarily unavailable. Try again.' });
+        }
+      } finally { if (!res.destroyed) res.end(); }
+      return;
+    }
+    if (req.method === 'GET' && url.pathname === '/api/programs') {
+      const data = await store.read();
+      const user = current(data, key);
+      return json(res, 200, programView(data, user, { demo, operator: isOperator(user),
+        seasonId: url.searchParams.get('season'), preview: url.searchParams.get('preview'), profileId: url.searchParams.get('profile') }));
+    }
     if (url.pathname === '/mail/unsubscribe' && ['GET', 'POST'].includes(req.method)) {
       const unsubscribe = url.searchParams.get('token') || '';
       ensure(/^[A-Za-z0-9_-]{43}$/.test(unsubscribe), 'Invalid unsubscribe link.', 404);
@@ -957,7 +1093,8 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url.pathname === '/api/matches/import') return json(res, 200, await importMatch(req));
     if (req.method === 'POST' && url.pathname.startsWith('/api/')) return json(res, 200, await mutate(req, res, url.pathname.slice(5), key));
-    const spa = ['/about', '/teams', '/clan', '/terms', '/privacy'].includes(url.pathname) || /^\/players\/[a-z0-9-]+$/.test(url.pathname);
+    const spa = ['/about', '/teams', '/clan', '/terms', '/privacy', '/patch-intel', '/house'].includes(url.pathname) ||
+      /^\/(?:players\/[a-z0-9-]+|passport(?:\/[a-z0-9-]+)?|og(?:\/dashboard)?|drops(?:\/[a-z0-9-]+)?|next(?:\/(?:enter|gallery|finalists|rules|judge|winners|entry\/[a-z0-9-]+))?)$/.test(url.pathname);
     const asset = Object.hasOwn(assets, url.pathname) ? assets[url.pathname] : spa ? assets['/'] : null;
     if (asset?.[1] === 'video/mp4' && ['GET', 'HEAD'].includes(req.method)) {
       try { return await streamVideo(req, res, new URL(`./public/${asset[0]}`, import.meta.url)); }
@@ -1075,6 +1212,20 @@ if (process.env.PATCH_FEED_URL && process.env.GEMINI_API_KEY) {
   void poll();
 }
 
+await pruneChats(store.chats);
+setInterval(async () => { try { await pruneChats(store.chats); } catch(error) { console.warn('Ask FaZe retention cleanup failed:',error.name); } }, 3_600_000).unref();
+
+let alertTick = false;
+setInterval(async () => {
+  if (alertTick) return;
+  alertTick = true;
+  try {
+    const data = await store.read();
+    if (Object.values(data.programs || {}).some(state => Object.keys(state.waitlist).length)) await store.write(updated => sendDropAlerts(updated, demo));
+  } catch { console.warn('Drop alerts will retry.'); }
+  finally { alertTick = false; }
+}, 60_000).unref();
+
 if (mailConfigured(origin)) {
   let processing = false;
   const sendPending = async () => {
@@ -1088,4 +1239,15 @@ if (mailConfigured(origin)) {
   void sendPending();
 }
 
-server.listen(port, process.env.HOST || '127.0.0.1', () => console.log(`FaZe Clan ready at ${origin} · ${store.name}${demo ? ' · demo enabled' : ''}`));
+server.listen(port, host);
+try {
+  await once(server, 'listening');
+} catch (error) {
+  if (!canUseFreePort || error.code !== 'EADDRINUSE') throw error;
+  server.listen(0, host);
+  await once(server, 'listening');
+  originUrl.port = String(server.address().port);
+  origin = originUrl.origin;
+  console.log(`Port ${port} is busy. Using port ${server.address().port}.`);
+}
+console.log(`FaZe Clan ready at ${origin} · ${store.name}${demo ? ' · demo enabled' : ''}`);

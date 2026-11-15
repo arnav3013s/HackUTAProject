@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { products } from './catalog.mjs';
+import { pgChatStore, sqliteChatStore } from './chat-store.mjs';
 
 function initial(demo) {
   return {
@@ -36,6 +37,7 @@ export async function openStore(demo) {
     await pool.query('INSERT INTO patchline_state VALUES (1, $1) ON CONFLICT DO NOTHING', [initial(demo)]);
     return {
       name: 'Tiger Data',
+      chats: await pgChatStore(pool),
       async read() {
         return (await pool.query('SELECT body FROM patchline_state WHERE id = 1')).rows[0].body;
       },
@@ -106,6 +108,7 @@ export async function openStore(demo) {
   const load = () => JSON.parse(db.prepare('SELECT body FROM state WHERE id = 1').get().body);
   return {
     name: 'SQLite',
+    chats: sqliteChatStore(db),
     read: load,
     write(update) {
       db.exec('BEGIN IMMEDIATE');

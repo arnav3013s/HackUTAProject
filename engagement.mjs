@@ -142,23 +142,31 @@ export function mailConfigured(origin) {
   return origin.startsWith('https://') && Boolean(process.env.RESEND_API_KEY && process.env.REPLAY_EMAIL_FROM);
 }
 
+function eligibleNotice(user, notice) {
+  if (!user?.email || user.demo) return false;
+  if (notice.transactional) return Boolean(user.adultConfirmed && (user.googleSub || user.discordSub));
+  return Boolean(user.googleSub && user.emailEnabled && user.unsubscribeToken);
+}
+
 export async function deliverNotices(store, origin, now = Date.now()) {
   if (!mailConfigured(origin)) return 0;
   const dayAgo = now - day;
   const snapshot = await store.read();
-  const recipients = Object.values(snapshot.users).filter(user => !user.demo && user.googleSub && user.email && user.emailEnabled && user.unsubscribeToken);
+  const recipients = Object.values(snapshot.users).filter(user =>
+    eligibleNotice(user, {}) || user.inbox?.some(notice => notice.email && notice.transactional && eligibleNotice(user, notice)));
   if (!recipients.length) return 0;
   const jobs = await store.write(data => {
     const batches = [];
     for (const { id } of recipients) {
       const user = data.users[id];
-      if (!user?.emailEnabled || user.demo || !user.googleSub || !user.email || !user.unsubscribeToken) continue;
+      if (!user || user.demo) continue;
       syncNotices(user, now);
       if (user.inbox.some(item => item.delivery?.sentAt >= dayAgo || item.delivery?.lease > now)) continue;
       const candidate = user.inbox.find(item => {
         const delivery = item.delivery || {};
         const created = Date.parse(item.at);
-        return item.email && !item.readAt && !delivery.sentAt && !delivery.failed && created >= Math.max(dayAgo, user.emailEnabled)
+        return item.email && eligibleNotice(user, item) && (item.transactional || !item.readAt) && !delivery.sentAt && !delivery.failed &&
+          created >= (item.transactional ? dayAgo : Math.max(dayAgo, user.emailEnabled))
           && (!delivery.lease || delivery.lease <= now) && (!delivery.nextAt || delivery.nextAt <= now)
           && (item.kind !== 'returning' || now - (user.lastVisitAt || 0) >= day && engagement(user, now, []).stage === 'returning');
       });
@@ -168,12 +176,13 @@ export async function deliverNotices(store, origin, now = Date.now()) {
       if (now - delivery.firstAt >= day) continue;
       delivery.tries = (delivery.tries || 0) + 1;
       delivery.lease = now + 5 * 60_000;
-      const unsubscribe = `${origin}/mail/unsubscribe?token=${user.unsubscribeToken}`;
+      const unsubscribe = candidate.transactional ? null : origin + '/mail/unsubscribe?token=' + user.unsubscribeToken;
+      const destination = new URL(candidate.route || '/', origin + '/').href;
       const message = delivery.message ||= {
         from: process.env.REPLAY_EMAIL_FROM, to: [user.email],
         subject: `FaZe Clan · ${candidate.title}`,
-        text: `${candidate.message}\n\nOpen FaZe Clan: ${origin}/${candidate.route}\n\nUnsubscribe: ${unsubscribe}`,
-        headers: { 'List-Unsubscribe': `<${unsubscribe}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
+        text: candidate.message + '\n\nOpen FaZe Clan: ' + destination + (unsubscribe ? '\n\nUnsubscribe: ' + unsubscribe : ''),
+        ...(unsubscribe ? { headers: { 'List-Unsubscribe': '<' + unsubscribe + '>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } } : {})
       };
       batches.push({ id, notice: candidate.id, tries: delivery.tries, message });
       if (batches.length === 10) break;
@@ -185,7 +194,8 @@ export async function deliverNotices(store, origin, now = Date.now()) {
     let ok = false;
     let permanent = false;
     const current = (await store.read()).users[job.id];
-    if (current?.emailEnabled && current.googleSub && !current.demo && current.email === job.message.to[0]) {
+    const notice = current?.inbox?.find(item => item.id === job.notice);
+    if (notice && eligibleNotice(current, notice) && current.email === job.message.to[0]) {
       try {
         const idempotency = createHash('sha256').update(`${job.id}:${job.notice}`).digest('hex');
         const result = await fetchJson('https://api.resend.com/emails', {

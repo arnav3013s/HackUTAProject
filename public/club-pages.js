@@ -2,6 +2,7 @@ import { h, useEffect, useRef, useState, Image, Icon, LinkButton, Title, Section
 import { gallery } from './gallery-data.js';
 import { divisions, galleryFilters, primaryGalleryGames, updates } from './esports-data.js';
 import { teams } from './teams-data.js';
+import { passportConfig } from './passport-config.js';
 
 const divisionName = key => divisions.find(entry=>entry.key===key)?.name;
 const divisionPhoto = key => gallery.find(x=>x.game===key);
@@ -14,7 +15,60 @@ function Moment({ photo, open, className = '' }) {
     h('span',{className:'ai-moment-text'},h('span',{className:'ai-kicker'},divisionName(photo.game)),h('strong',null,photo.title),h('small',null,photo.subject)));
 }
 
+function GalleryBackdrop({ section }) {
+  const urls = [...new Set(gallery.map(photo => photo.url))].slice(0,12);
+  const [layers,setLayers]=useState([]);
+  const [running,setRunning]=useState(false);
+  useEffect(()=>{
+    if(!urls.length || !section.current)return;
+    const motion=matchMedia('(prefers-reduced-motion: reduce)');
+    const images=new Map();
+    let mounted=true, inView=false, current=-1, timer, advanceActive=false;
+    function preload(src) {
+      if (!images.has(src)) images.set(src,new Promise(resolve=>{
+        const candidate=new window.Image();
+        candidate.decoding='async';
+        candidate.onload=()=>resolve(true);
+        candidate.onerror=()=>resolve(false);
+        candidate.src=src;
+      }));
+      return images.get(src);
+    }
+    async function advance() {
+      if(advanceActive)return;
+      advanceActive=true;
+      try {
+        for(let offset=1;offset<=urls.length;offset++){
+          const index=(current+offset)%urls.length;
+          if (index===current) break;
+          const src=urls[index];
+          if(!await preload(src))continue;
+          if(!mounted||!inView||document.hidden)return;
+          current=index;
+          setLayers(previous=>[...previous.slice(-1).map(item=>({...item,on:false})),{src,on:true}]);
+          break;
+        }
+      } finally { advanceActive=false; }
+    }
+    function sync(){
+      clearInterval(timer);
+      const active=inView&&!document.hidden;
+      setRunning(active&&!motion.matches);
+      if(!active)return;
+      if(current===-1){preload(urls[0]);if(!motion.matches&&urls[1])preload(urls[1]);void advance();}
+      if(!motion.matches)timer=setInterval(advance,6000);
+    }
+    const observer=new IntersectionObserver(entries=>{inView=entries[0].isIntersecting;sync();});
+    observer.observe(section.current);
+    document.addEventListener('visibilitychange',sync);
+    motion.addEventListener('change',sync);
+    return()=>{mounted=false;clearInterval(timer);observer.disconnect();document.removeEventListener('visibilitychange',sync);motion.removeEventListener('change',sync);};
+  },[section]);
+  return h('div',{className:'clan-gallery-bg'+(running?'':' paused'),'aria-hidden':true},layers.map(layer=>h('img',{key:layer.src,src:layer.src,alt:'',className:layer.on?'on':'',decoding:'async'})));
+}
+
 export function Gallery({ data, play }) {
+  const section=useRef(null);
   const [filter,setFilter]=useState(lastGalleryFilter);
   const [selection,setSelection]=useState(null);
   const [videoError,setVideoError]=useState(false);
@@ -22,7 +76,8 @@ export function Gallery({ data, play }) {
   const open=(photo, items)=>setSelection({index:items.indexOf(photo),items});
   const shift=step=>setSelection(state=>({...state,index:(state.index+step+state.items.length)%state.items.length}));
   const active=selection?.items[selection.index];
-  return h('div',{className:'ai-gallery-page'},
+  return h('div',{className:'ai-gallery-page',ref:section},
+    h(GalleryBackdrop,{section}),
     h('section',{className:'ai-editorial-hero'},
       h(Image,{src:gallery[0].url,alt:'FaZe players celebrating their 2022 Antwerp Major victory',priority:true,fallback:gallery[3].url}),
       h('div',{className:'ai-editorial-copy'},h('p',{className:'ai-kicker'},'FaZe ESPORTS GALLERY'),h('h1',null,'THE LEGACY',h('br'),'OF ',h('em',null,'FaZe')),h('p',null,'More than a team. A culture. A legacy.'),
@@ -88,10 +143,64 @@ function VideoCard({ clip, play }) {
     h('span',{className:'ai-video-text'},h('span',{className:'ai-kicker'},clip.label || clip.channel+' / '+clip.year),h('strong',null,clip.title)));
 }
 
-export function VideoModal({ clip, close }) {
+export function VideoModal({ clip, close, data, notify, refresh }) {
+  const iframe=useRef(null);
+  const [eligible,setEligible]=useState(false);
+  const [watched,setWatched]=useState(0);
+  const [done,setDone]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const ticket=useRef(null);
+  const player=useRef(false);
+  const send=useRef(false);
+  const origin='https://www.youtube-nocookie.com';
+  const allowed=Boolean(data?.user && (data.user.demo || data.user.programs?.verified) && data.faze.videos.some(entry=>entry.id===clip.id));
+  const register=()=>{
+    iframe.current?.contentWindow?.postMessage(JSON.stringify({event:'listening',id:'faze-watch-player',channel:'widget'}),origin);
+    iframe.current?.contentWindow?.postMessage(JSON.stringify({event:'command',func:'addEventListener',args:['onStateChange'],id:'faze-watch-player',channel:'widget'}),origin);
+  };
+  useEffect(()=>{
+    if(!allowed)return;
+    let mounted=true;
+    const onMessage=e=>{
+      if(e.origin!==origin || e.source!==iframe.current?.contentWindow)return;
+      let message=e.data;
+      if(typeof message==='string')try {message=JSON.parse(message);} catch {return;}
+      const state=message?.event==='onStateChange'?message.info:message?.info?.playerState;
+      if(typeof state==='number'){player.current=state===1;if(state===1)setEligible(true);}
+    };
+    window.addEventListener('message',onMessage);
+    const subscription=setInterval(()=>{if(!player.current)register();},1500);
+    const timer=setInterval(async()=>{
+      if(!ticket.current || !player.current || document.hidden || send.current)return;
+      send.current=true;
+      try{
+        const result=await api('passport-watch-tick',{id:ticket.current});
+        if(mounted)setWatched(result.seconds);
+      }catch{}
+      finally{send.current=false;}
+    },5000);
+    return()=>{mounted=false;window.removeEventListener('message',onMessage);clearInterval(timer);clearInterval(subscription);};
+  },[allowed]);
+  async function start(){
+    setBusy(true);
+    try{const result=await api('passport-watch-start',{clip:clip.id});ticket.current=result.id;setWatched(0);}
+    catch(error){notify(error.message,true);}
+    finally{setBusy(false);}
+  }
+  async function claim(){
+    setBusy(true);
+    try{const result=await api('passport-watch-finish',{id:ticket.current});ticket.current=null;setDone(true);await refresh();notify(result.message);}
+    catch(error){notify(error.message,true);}
+    finally{setBusy(false);}
+  }
   return h(Modal,{label:'video player',className:'ai-video-modal',close},
-    h('iframe',{title:clip.title,src:'https://www.youtube-nocookie.com/embed/'+encodeURIComponent(clip.id)+'?autoplay=1&rel=0&playsinline=1',allow:'autoplay; encrypted-media; picture-in-picture; fullscreen',allowFullScreen:true,referrerPolicy:'strict-origin-when-cross-origin'}),
-    h('div',{className:'ai-lightbox-caption'},h('h2',null,clip.title),h(LinkButton,{href:clip.url,kind:'outline',external:true,icon:'diagonal'},'Open on YouTube')));
+    h('iframe',{ref:iframe,onLoad:register,title:clip.title,src:origin+'/embed/'+encodeURIComponent(clip.id)+'?autoplay=1&rel=0&playsinline=1&enablejsapi=1&origin='+encodeURIComponent(location.origin),allow:'autoplay; encrypted-media; picture-in-picture; fullscreen',allowFullScreen:true,referrerPolicy:'strict-origin-when-cross-origin'}),
+    h('div',{className:'ai-lightbox-caption'},h('div',null,h('h2',null,clip.title),
+      allowed&&!done&&(!ticket.current?h('button',{type:'button',className:'ai-button outline',disabled:busy||!eligible,onClick:start},'Start Passport watch task'):
+        h('div',null,h('p',null,Math.min(watched,passportConfig.watchSeconds)+' / '+passportConfig.watchSeconds+' seconds of active viewing'),
+          h('button',{type:'button',className:'ai-button solid',disabled:busy||watched<passportConfig.watchSeconds,onClick:claim},'Claim watch XP'))),
+      done&&h('p',{role:'status'},'Watch XP earned.')),
+      h(LinkButton,{href:clip.url,kind:'outline',external:true,icon:'diagonal'},'Open on YouTube')));
 }
 
 export function News({ data, play }) {
