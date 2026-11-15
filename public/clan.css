@@ -1,7 +1,7 @@
-@font-face{font-family:Afterimage Display;src:url('/brand/anton.woff2') format('woff2');font-display:swap}
-@font-face{font-family:Afterimage Sans;src:url('/brand/source-sans.woff2') format('woff2');font-display:swap}
-@font-face{font-family:Afterimage Sans;src:url('/brand/source-sans-bold.woff2') format('woff2');font-weight:700;font-display:swap}
-:root{--ai-bg:#0a0a0b;--ai-panel:#141416;--ai-line:#ffffff24;--ai-white:#f6f3ef;--ai-muted:#b4afaf;--ai-red:#f23542;--ai-brand:#e4002b;--ai-head:'Afterimage Display',Impact,sans-serif;--ai-font:'Afterimage Sans',Arial,sans-serif;--ai-max:1440px;--ai-gutter:clamp(22px,5vw,84px)}
+@font-face{font-family:Clan Display;src:url('/brand/anton.woff2') format('woff2');font-display:swap}
+@font-face{font-family:Clan Sans;src:url('/brand/source-sans.woff2') format('woff2');font-display:swap}
+@font-face{font-family:Clan Sans;src:url('/brand/source-sans-bold.woff2') format('woff2');font-weight:700;font-display:swap}
+:root{--ai-bg:#0a0a0b;--ai-panel:#141416;--ai-line:#ffffff24;--ai-white:#f6f3ef;--ai-muted:#b4afaf;--ai-red:#f23542;--ai-brand:#e4002b;--ai-head:'Clan Display',Impact,sans-serif;--ai-font:'Clan Sans',Arial,sans-serif;--ai-max:1440px;--ai-gutter:clamp(22px,5vw,84px)}
 html{scroll-padding-top:83px}
 body{margin:0;background:var(--ai-bg);color:var(--ai-white);font-family:var(--ai-font);font-size:17px}
 :where(.ai-app) *{box-sizing:border-box}

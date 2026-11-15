@@ -101,7 +101,7 @@ export function homeExperience(state) {
   const returning = journey.stage === 'returning';
   const gettingStarted = !user || journey.stage === 'new';
   const name = user?.name.split(' ')[0] || 'fan';
-  const headline = returning ? ['WELCOME', 'BACK.'] : gettingStarted ? ['ENTER', 'FAZE REPLAY.'] : ['MAKE YOUR', 'NEXT PLAY.'];
+  const headline = returning ? ['WELCOME', 'BACK.'] : gettingStarted ? ['ENTER', 'FaZe REPLAY.'] : ['MAKE YOUR', 'NEXT PLAY.'];
   const lead = returning
     ? journey.comeback ? `It’s been ${journey.daysAway} days, ${name}. Your comeback bonus and a fresh set of missions are ready.` : `It’s been ${journey.daysAway} days, ${name}. Catch up with a new set of daily missions.`
     : gettingStarted ? 'Complete a mission, earn points, and bring a friend into the fan club.'
@@ -117,7 +117,7 @@ export function homeExperience(state) {
         <img class="club-hero-image" src="/art/stage.jpg" alt="" fetchpriority="high">
         ${hasVideo ? `<video class="club-hero-image club-hype-video" src="${e(video)}" preload="none" muted loop playsinline hidden></video><button class="btn quiet motion-clip" data-motion-clip aria-pressed="false">Play homepage reel</button>` : ''}
         <div class="hero-stage-copy">
-          <p class="club-kicker">${returning ? 'RETURNING FAN' : user ? 'YOUR FAN DASHBOARD' : 'THE FAZE FAN HUB'}</p>
+          <p class="club-kicker">${returning ? 'RETURNING FAN' : user ? 'YOUR FAN DASHBOARD' : 'THE FaZe FAN HUB'}</p>
           <h1><span>${headline[0]}</span><span>${headline[1]}</span></h1>
           <p class="club-hero-lead">${e(lead)}</p>
           <div class="actions">${primary}<button class="btn hero-alt" data-play-clip="${e(clip?.id || '')}"><span aria-hidden="true">▶</span> Watch a highlight</button></div>
@@ -139,11 +139,11 @@ export function homeExperience(state) {
         ${user ? btn('View invites', '#invites', 'text-btn') : ''}</div>
       </section>
       <section class="club-watch">
-        <div class="row"><div><p class="club-kicker">${e(clip?.game || 'FAZE CLASSICS')}</p><h2>${clip?.game ? 'Recommended for you' : 'From the FaZe archive'}</h2></div>${btn('More clips', '#news', 'text-btn')}</div>
+        <div class="row"><div><p class="club-kicker">${e(clip?.game || 'FaZe CLASSICS')}</p><h2>${clip?.game ? 'Recommended for you' : 'From the FaZe archive'}</h2></div>${btn('More clips', '#news', 'text-btn')}</div>
         ${featureClip(clip)}
       </section>
     </div>
-    ${returning && journey.rewind ? `<section class="mission-promo"><div><h2>Your Replay rewind</h2><p>${e(journey.rewind)}</p></div>${btn('Explore your history', '#news', 'quiet')}</section>` : ''}
+    ${returning && journey.rewind ? `<section class="mission-promo"><div><h2>Your Clan rewind</h2><p>${e(journey.rewind)}</p></div>${btn('Explore your history', '#news', 'quiet')}</section>` : ''}
   </div>`;
 }
 
@@ -170,7 +170,7 @@ export function walkthroughExperience(state, invite, requestedStep) {
         <button class="btn primary" type="submit">Start with a demo account <span aria-hidden="true">→</span></button></form>` : ''}
       <div class="actions">${state.config.google ? btn('Continue with Google', `/auth/google?from=welcome&invite=${encodeURIComponent(invite)}`, 'quiet') : ''}
       ${btn('Sign in or create an account', '#account', 'text-btn')}</div>`,
-    () => `<h2>Which games do you follow?</h2><p>Replay uses these picks until your match history shows what you play most.</p>${preferencesForm(state)}`,
+    () => `<h2>Which games do you follow?</h2><p>Clan uses these picks until your match history shows what you play most.</p>${preferencesForm(state)}`,
     () => `<h2>Earn your first mission points.</h2>
       ${journey.starterDone ? `<div class="walk-wallet"><span class="done-label">✓ Mission complete</span><strong>${n(user.balance)} <small>POINTS</small></strong></div><p>${e(journey.starter.detail)}</p>`
         : `<p>FaZe’s first ILLCAMS upload was in <strong>2010</strong>. Answer the question to add ${state.rewardRules.archive} points to your wallet.</p>
@@ -217,10 +217,10 @@ export function invitesExperience(state) {
     <div><p class="club-kicker">REFERRAL PROGRAM</p><h1>BUILD YOUR SQUAD.</h1><p>Each qualifying friend earns you <strong>${r.referral} points</strong>. See who joined and when your points cleared.</p></div>
   </section>
   ${user ? `<section class="panel invite-work"><div><h2>Your invite link</h2>
-    <p>${user.demo ? 'To try the full referral, open this link in a private browser window, start a new demo account, and complete a mission.' : 'Share this link with a friend so Replay can credit the referral when they qualify.'}</p>
+    <p>${user.demo ? 'To try the full referral, open this link in a private browser window, start a new demo account, and complete a mission.' : 'Share this link with a friend so Clan can credit the referral when they qualify.'}</p>
     <div class="copy-field"><input readonly aria-label="Your invite link" value="${e(link)}"><button class="btn primary" data-copy="${e(link)}">Copy link</button></div></div>
     <div class="invite-counts"><div><strong>${approved}/${r.referralCap}</strong><span>APPROVED</span></div><div><strong>${pending}</strong><span>PENDING</span></div><div><strong>${approved * r.referral}</strong><span>POINTS EARNED</span></div></div>
-  </section>` : `<section class="panel invite-work"><div><h2>Get your personal link</h2><p>It’s generated when you join Afterimage.</p></div>${btn('Start walkthrough', '#welcome', 'primary')}</section>`}
+  </section>` : `<section class="panel invite-work"><div><h2>Get your personal link</h2><p>It’s generated when you join Clan.</p></div>${btn('Start walkthrough', '#welcome', 'primary')}</section>`}
   <div class="invite-steps">
     <article><strong>1. Share</strong><p>Copy your link and send it to a friend.</p></article>
     <article><strong>2. They play</strong><p>${user?.demo || !user && state.config.demo ? 'A demo friend qualifies after their first mission.' : `Both fans verify their accounts. Your friend must play on ${r.referralTasks} different days and be signed up for ${r.minAge} days before review.`}</p></article>
@@ -241,7 +241,7 @@ export function inboxExperience(state, showPreview) {
     message: 'Your daily missions are ready. Check in, answer the archive question, and see your points when you return.',
     route: '#missions'
   };
-  const preview = showPreview ? `<article class="mail-preview"><p class="club-kicker">EMAIL PREVIEW</p><h3>FaZe Afterimage · ${e(notice.title)}</h3><p>${e(notice.message)}</p>${btn('Open missions', notice.route, 'primary')}<p class="dim">Unsubscribe from email updates at any time.</p></article>` : '';
+  const preview = showPreview ? `<article class="mail-preview"><p class="club-kicker">EMAIL PREVIEW</p><h3>FaZe Clan · ${e(notice.title)}</h3><p>${e(notice.message)}</p>${btn('Open missions', notice.route, 'primary')}<p class="dim">Unsubscribe from email updates at any time.</p></article>` : '';
   return `${title('Inbox', 'See who joined your squad, what you earned, and when there’s a reason to come back.')}
   ${!user ? `<section class="panel invite-work"><p>Your inbox is part of your fan profile.</p>${btn('Open an account', '#account', 'primary')}</section>`
     : `<div class="inbox-grid">
@@ -269,5 +269,5 @@ export function renderStatus(user) {
       <div><dt>Active</dt><dd>You’ve completed an activity and your last one was less than seven days ago.</dd></div>
       <div><dt>Returning</dt><dd>At least seven days have passed since your last mission, match, review submission, or redemption.</dd></div>
     </dl>
-    <p>${journey.primaryGame ? `Your main game is ${e(journey.primaryGame)}. Replay uses your recent playtime when available, then your saved game picks.` : 'Pick your games in the walkthrough to personalize your dashboard.'}</p>`;
+    <p>${journey.primaryGame ? `Your main game is ${e(journey.primaryGame)}. Clan uses your recent playtime when available, then your saved game picks.` : 'Pick your games in the walkthrough to personalize your dashboard.'}</p>`;
 }

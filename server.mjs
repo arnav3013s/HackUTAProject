@@ -4,14 +4,15 @@ import { createReadStream, existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { promisify } from 'node:util';
-import { creators, games, matchRules, news, products, rewardRules, samplePatch } from './catalog.mjs';
+import { creators, games, matchRules, news, ogQuizzes, products, rewardRules, samplePatch } from './catalog.mjs';
 import { faze } from './faze.mjs';
 import { openStore } from './store.mjs';
 import { analyze, clean, ensure, fetchJson, parsePatch, solanaRpc, tiers, verifyReceipt, vultrInstance } from './services.mjs';
 import { answerFan } from './assistant.mjs';
 import { categories, day, fanCategory, fanWallet, gameProfile, matchCredit, seedFans, seedMatchProfiles } from './fans.mjs';
 import { rosters } from './rosters.mjs';
-import { addNotice, dailyQuiz, deliverNotices, engagement, inboxView, mailConfigured, referralMilestones, starterQuiz, syncNotices, utcDate } from './engagement.mjs';
+import { addNotice, dailyQuiz, deliverNotices, engagement, inboxView, mailConfigured, referralMilestones, starterQuiz, syncNotices, utcDate, weeklyProgress } from './engagement.mjs';
+import { teams, photoPath } from './public/teams-data.js';
 
 const scrypt = promisify(scryptCallback);
 const port = Number(process.env.PORT || 4173);
@@ -21,6 +22,7 @@ const homepageVideo = process.env.HERO_VIDEO_URL ||
 const secure = origin.startsWith('https:');
 const demo = process.env.DEMO_MODE === '1' || (process.env.DEMO_MODE !== '0' && !process.env.PUBLIC_ORIGIN);
 const google = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+const discord = Boolean(process.env.DISCORD_CLIENT_ID && process.env.DISCORD_CLIENT_SECRET);
 const operators = new Set((process.env.OPERATOR_EMAILS || '').toLowerCase().split(',').map(email => email.trim()).filter(Boolean));
 const reviewers = new Set((process.env.REVIEWER_EMAILS || '').toLowerCase().split(',').map(email => email.trim()).filter(Boolean));
 const ingestToken = process.env.MATCH_INGEST_TOKEN;
@@ -29,7 +31,7 @@ const content = process.env.CONTENT_FILE ? JSON.parse(await readFile(process.env
 const token = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
 const stored = await store.read();
-if (!stored.activityMigrated || (demo && (!stored.fanLabSeed || !stored.matchProfilesSeeded))) {
+if (!stored.activityMigrated || (demo && (stored.fanLabSeed !== 3 || !stored.matchProfilesSeeded))) {
   await store.write((data, _record, log) => {
     if (!data.activityMigrated) {
       for (const user of Object.values(data.users)) {
@@ -48,12 +50,12 @@ if (!stored.activityMigrated || (demo && (!stored.fanLabSeed || !stored.matchPro
 
 function addUser(data, fields, invite, existingUserId) {
   const id = randomUUID();
-  const user = { id, created: Date.now(), invite: `PL-${randomBytes(6).toString('hex').toUpperCase()}`, links: {}, ledger: [], ...fields };
+  const user = { id, created: Date.now(), invite: `PL-${randomBytes(6).toString('hex').toUpperCase()}`, links: {}, ledger: [], accountType: 'New User', ...fields };
   data.users[id] = user;
   const inviter = Object.values(data.users).find(candidate => candidate.invite === invite && !candidate.persona && Boolean(candidate.demo) === Boolean(user.demo));
   if (inviter && inviter.id !== existingUserId && inviter.id !== id) {
     data.referrals[id] = { inviter: inviter.id, invitee: id, status: 'pending', at: new Date().toISOString() };
-    addNotice(inviter, { id: `invite-joined-${id}`, title: 'A friend joined your invite', message: `${user.name} joined Afterimage. Approval will appear under Rewards.`, route: '#rewards/redeem' });
+    addNotice(inviter, { id: `invite-joined-${id}`, title: 'A friend joined your invite', message: `${user.name} joined Clan. Approval will appear under Rewards.`, route: '#rewards/redeem' });
   }
   syncNotices(user);
   return user;
@@ -65,9 +67,16 @@ const balance = user => fanWallet(user).balance;
 const credit = (user, id, label, points, log) => {
   ensure(!user.ledger.some(entry => entry.id === id), 'This reward has already been applied.', 409);
   const at = new Date().toISOString();
-  user.ledger.push({ id, label, points, at });
+  user.ledger.push({ id, label, points, at, ...(points > 0 ? { expiresAt: new Date(Date.now() + rewardRules.expiryDays * day).toISOString() } : {}) });
   log({ time: at, kind: points < 0 ? 'redeem' : 'points', subject: user.id, amount: points, sample: Boolean(user.demo) });
 };
+function awardDailyCompletion(user, log) {
+  const date = utcDate();
+  if (['check-in', 'trivia', 'watch-task'].every(task => user.ledger.some(item => item.id === `${task}:${date}`)) &&
+      !user.ledger.some(item => item.id === `completion:${date}`)) {
+    credit(user, `completion:${date}`, 'Daily task completion bonus', rewardRules.completion, log);
+  }
+}
 
 function approveReferral(referral, inviter, invitee, log) {
   credit(inviter, `referral:${invitee.id}`, 'Approved referral', rewardRules.referral, log);
@@ -81,11 +90,11 @@ function approveReferral(referral, inviter, invitee, log) {
   });
 }
 
-function finishDemoReferral(data, user, log) {
+function finishPreviewReferral(data, user, log) {
   const referral = data.referrals[user.id];
-  if (!user.demo || referral?.status !== 'pending') return;
+  if (!demo || referral?.status !== 'pending') return;
   const inviter = data.users[referral.inviter];
-  if (!inviter?.demo) return;
+  if (!inviter || Boolean(inviter.demo) !== Boolean(user.demo)) return;
   const earned = inviter.ledger.filter(entry => entry.id.startsWith('referral:')).length;
   if (earned >= rewardRules.referralCap) {
     referral.status = 'capped';
@@ -125,6 +134,33 @@ const inChallenge = user => {
   const age = Date.now() - user.created;
   return age >= 0 && age < rewardRules.days * day && dailyCount(user) < rewardRules.days;
 };
+function accountType(user, now = Date.now()) {
+  if (user.personaType && user.demo) return user.personaType;
+  if (user.youtube || user.profile) return 'Streamer';
+  if (engagement(user, now).stage === 'returning') return 'Returning User';
+  if (now - user.created < rewardRules.days * day) return 'New User';
+  return 'Normal User';
+}
+const existingTypes = await store.read();
+if (Object.values(existingTypes.users).some(user => user.accountType !== accountType(user))) {
+  await store.write(data => { for (const user of Object.values(data.users)) user.accountType = accountType(user); });
+}
+function fanEra(user) {
+  const year = user.fanSinceYear;
+  if (!year) return null;
+  const era = year <= 2011 ? 'Trickshot' : year <= 2013 ? 'Montage' : year <= 2017 ? 'Vlog/House' : year <= 2020 ? 'Fortnite' : 'Next Era';
+  const badges = [['Trickshot', 2011], ['Montage', 2013], ['Vlog/House', 2017], ['Fortnite', 2020]]
+    .filter(([, end]) => year <= end).map(([name]) => name);
+  return { year, era, badges, selfReported: true, multiplier: user.demo && year <= 2020 ? 1.5 : 1 };
+}
+function pointsLeaders(data, user) {
+  const now = Date.now();
+  const windows = { weekly: now - 7 * day, monthly: now - 30 * day, allTime: 0 };
+  const eligible = Object.values(data.users).filter(candidate => candidate.demo ? demo && (candidate.persona || candidate.id === user?.id) : candidate.leaderboardOptIn);
+  return Object.fromEntries(Object.entries(windows).map(([period, since]) => [period, eligible.map(candidate => ({
+    id: candidate.id, name: candidate.name, points: candidate.ledger.reduce((total, entry) => total + (entry.points > 0 && entry.id !== 'demo' && Date.parse(entry.at) >= since ? entry.points : 0), 0)
+  })).sort((a, b) => b.points - a.points || a.name.localeCompare(b.name)).slice(0, 10)]));
+}
 function publicState(data, user) {
   const patches = Object.values(data.patches).filter(patch => !patch.sample).sort(newest);
   if (demo) patches.push(user?.demoPatch || samplePatch);
@@ -143,6 +179,10 @@ function publicState(data, user) {
     (!row.private || (playerEmail && row.members?.includes(playerEmail))));
   const result = {
     games, patches, creators: publishedCreators, news, faze, rosters, rewardRules, matchRules, missions: engagement(null),
+    ogQuizzes: ogQuizzes.map(({ correct, ...quiz }) => quiz),
+    playerPhotos: Object.fromEntries(teams.flatMap(team => team.players.map(member => [team.slug + '/' + member.slug,
+      existsSync(new URL('./public' + photoPath(team, member), import.meta.url))]))),
+    pointsLeaders: pointsLeaders(data, user),
     products: products.filter(item => !item.demoOnly || demo).map(({ cost, ...item }) => ({
       ...item,
       stock: data.inventory[item.id] ?? item.stock,
@@ -150,7 +190,7 @@ function publicState(data, user) {
     })),
     standings: leagueEntries.map(({ name, game, league, score }) => ({ name, game, league, score })),
     clips,
-    config: { demo, google, email: mailConfigured(origin), gemini: Boolean(process.env.GEMINI_API_KEY), receiptAuthority: Boolean(process.env.SOLANA_RECEIPT_AUTHORITY), database: store.name, heroVideo: homepageVideo, memberVideo: Boolean(process.env.MEMBER_VIDEO_URL) }
+    config: { demo, google, discord, email: mailConfigured(origin), gemini: Boolean(process.env.GEMINI_API_KEY), receiptAuthority: Boolean(process.env.SOLANA_RECEIPT_AUTHORITY), database: store.name, heroVideo: homepageVideo, memberVideo: Boolean(process.env.MEMBER_VIDEO_URL) }
   };
   if (!user) return result;
   const owned = Object.values(data.redemptions).filter(order => order.user === user.id);
@@ -160,6 +200,7 @@ function publicState(data, user) {
   const returning = Date.now() - user.created >= rewardRules.minAge * day;
   return { ...result, user: {
     id: user.id, name: user.name, demo: Boolean(user.demo), verified: Boolean(user.googleSub), youtube: user.youtube,
+    accountType: accountType(user), personaType: user.personaType || null, leaderboardOptIn: Boolean(user.leaderboardOptIn), weekly: weeklyProgress(user), era: fanEra(user),
     reviewer: isReviewer(user), operator: isOperator(user), links: user.links, invite: user.invite,
     ...fanWallet(user), category: fanCategory(user, Date.now(), profile), ledger: user.ledger, creator: user.creator,
     canUseFanLab: Boolean(user.demo && demo), previewing: Boolean(user.previewOwner),
@@ -168,7 +209,7 @@ function publicState(data, user) {
     journey, inbox: inboxView(user),
     referred: Boolean(data.referrals[user.id]),
     referrals: Object.values(data.referrals).filter(referral => referral.inviter === user.id).map(({ status, invitee, at, approvedAt }) => ({
-      status, name: data.users[invitee]?.name || 'Afterimage fan', at, approvedAt,
+      status, name: data.users[invitee]?.name || 'Clan fan', at, approvedAt,
       ...(data.users[invitee] ? referralMilestones(data.users[invitee]) : {})
     })),
     reviewQueue: isOperator(user) && !user.demo ? Object.values(data.referrals).filter(referral => referral.status === 'pending').map(referral => {
@@ -324,6 +365,54 @@ async function googleFlow(req, res, url, key) {
   res.writeHead(302, { Location: flow.youtube ? '/#account' : walk ? '/#welcome' : '/#home' }).end();
 }
 
+async function discordFlow(req, res, url, key) {
+  ensure(discord, 'Discord sign-in needs OAuth credentials.', 503);
+  const callback = `${origin}/auth/discord/callback`;
+  if (url.pathname === '/auth/discord') {
+    const state = token();
+    const user = current(await store.read(), key);
+    await store.write(data => {
+      for (const [id, flow] of Object.entries(data.oauth)) if (flow.expires < Date.now()) delete data.oauth[id];
+      data.oauth[digest(state)] = { discord: true, expires: Date.now() + 600_000, user: user?.id,
+        invite: clean(url.searchParams.get('invite'), 20).toUpperCase() };
+    });
+    const params = new URLSearchParams({ client_id: process.env.DISCORD_CLIENT_ID, redirect_uri: callback,
+      response_type: 'code', scope: 'identify email', state, prompt: 'consent' });
+    return res.writeHead(302, { Location: `https://discord.com/oauth2/authorize?${params}`,
+      'Set-Cookie': cookie('pl_discord_oauth', state, 600) }).end();
+  }
+  const state = url.searchParams.get('state');
+  ensure(state && state === cookieValue(req, 'pl_discord_oauth'), 'Discord sign-in expired. Start again.', 403);
+  const flow = await store.write(data => {
+    const found = data.oauth[digest(state)];
+    ensure(found?.discord && found.expires > Date.now(), 'Discord sign-in expired. Start again.', 403);
+    delete data.oauth[digest(state)]; return found;
+  });
+  const code = url.searchParams.get('code');
+  ensure(code, 'Discord authorization was cancelled.');
+  const credentials = await fetchJson('https://discord.com/api/v10/oauth2/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: 'Basic ' + Buffer.from(process.env.DISCORD_CLIENT_ID + ':' + process.env.DISCORD_CLIENT_SECRET).toString('base64') },
+    body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: callback })
+  });
+  const profile = await fetchJson('https://discord.com/api/v10/users/@me', {
+    headers: { Authorization: `Bearer ${credentials.access_token}` }
+  });
+  ensure(profile.id && profile.email && profile.verified, 'Discord must return a verified email address.', 403);
+  const email = profile.email.toLowerCase();
+  await startSession(res, data => {
+    const existing = Object.values(data.users).find(user => user.discordSub === profile.id);
+    if (existing) return existing;
+    const sameEmail = Object.values(data.users).find(user => user.email === email);
+    if (sameEmail) {
+      ensure(current(data, key)?.id === sameEmail.id, 'Sign in to the existing account before linking Discord.', 409);
+      sameEmail.discordSub = profile.id; return sameEmail;
+    }
+    return addUser(data, { email, name: clean(profile.global_name || profile.username, 40) || 'Player', discordSub: profile.id }, flow.invite, flow.user);
+  }, key);
+  res.writeHead(302, { Location: '/#home' }).end();
+}
+
 async function publish(input) {
   const patch = parsePatch(input);
   const data = await store.read();
@@ -384,6 +473,19 @@ async function mutate(req, res, action, key) {
     });
     return { message: 'You’re on the list.' };
   }
+  if (action === 'contact') {
+    limit(req, 'contact', 5);
+    const name = clean(body.name, 80), company = clean(body.company, 100);
+    const email = clean(body.email, 254).toLowerCase(), message = clean(body.message, 1500);
+    ensure(name && company && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && message.length >= 10,
+      'Complete all contact fields with a valid email and message.', 400);
+    await store.write(data => {
+      data.contactRequests ??= [];
+      data.contactRequests.push({ name, company, email, message, at: new Date().toISOString() });
+      data.contactRequests = data.contactRequests.slice(-500);
+    });
+    return { message: 'Inquiry saved. The team can review it in the site database.' };
+  }
   if (action === 'ask') {
     limit(req, 'assistant', 20);
     const question = clean(body.question, 500);
@@ -411,7 +513,9 @@ async function mutate(req, res, action, key) {
       if (existing) return existing;
       const user = addUser(data, {
         name: sample.name, demo: true, created: sample.created, sampleOf: id, previewOwner: owner,
-        practiceReviewer: fanCategory(sample).name === 'Creator reviewer',
+        personaType: sample.personaType, fanSinceYear: sample.fanSinceYear,
+        profile: sample.profile ? structuredClone(sample.profile) : undefined,
+        practiceReviewer: sample.personaType === 'Streamer',
         ledger: structuredClone(sample.ledger), links: structuredClone(sample.links), matches: structuredClone(sample.matches || [])
       }, null);
       if (sample.ledger.some(item => item.id === 'redeem:seed')) {
@@ -447,6 +551,13 @@ async function mutate(req, res, action, key) {
         data.clipViews = {};
       }
       const player = current(data, key);
+      if (player) {
+        player.watchedClips ??= [];
+        if (!player.watchedClips.some(item => item.id === clip.id && item.at.slice(0, 10) === today)) {
+          player.watchedClips.push({ id: clip.id, at: now });
+          player.watchedClips = player.watchedClips.slice(-120);
+        }
+      }
       const marker = digest(`${player?.id || viewer}:${clip.id}`);
       if (!data.clipViews[marker]) {
         data.clipViews[marker] = true;
@@ -478,13 +589,6 @@ async function mutate(req, res, action, key) {
       await startSession(res, (data, log) => {
         ensure(!Object.values(data.users).some(user => user.email === email), 'An account already uses that email.', 409);
         const user = addUser(data, { email, name, salt, hash }, clean(body.invite, 20).toUpperCase(), current(data, key)?.id);
-        const referral = data.referrals[user.id];
-        if (demo && referral) {
-          const inviter = data.users[referral.inviter];
-          const earned = inviter.ledger.filter(entry => entry.id.startsWith('referral:')).length;
-          if (earned < rewardRules.referralCap) approveReferral(referral, inviter, user, log);
-          else referral.status = 'capped';
-        }
         return user;
       }, key);
       return { message: 'Account created.' };
@@ -528,7 +632,41 @@ async function mutate(req, res, action, key) {
       case 'onboarding-done':
         ensure(user.favoriteGames?.length && user.ledger.some(item => item.id === 'archive-quiz'), 'Pick a game and complete the first mission.');
         user.onboardingDone = true;
-        return { message: 'Your Replay dashboard is ready.' };
+        return { message: 'Your Clan dashboard is ready.' };
+      case 'leaderboard-optin':
+        user.leaderboardOptIn = body.enabled === true;
+        return { message: user.leaderboardOptIn ? 'You are visible on the points leaderboard.' : 'Your profile is hidden from the points leaderboard.' };
+      case 'fan-era': {
+        const year = Number(body.year);
+        ensure(Number.isInteger(year) && year >= 2010 && year <= new Date().getUTCFullYear(), 'Choose a year from 2010 to today.');
+        ensure(!user.fanSinceYear, 'Your fan-since year is already set.', 409);
+        user.fanSinceYear = year;
+        return { message: 'Your FaZe era is saved as self-reported history.' };
+      }
+      case 'og-quiz': {
+        ensure(user.demo || user.googleSub, 'Verify with Google to earn throwback points.', 403);
+        ensure(accountType(user) === 'Returning User' || fanEra(user)?.year <= 2020, 'Throwback tasks unlock for returning or OG fans.', 403);
+        const quiz = ogQuizzes.find(item => item.id === body.id);
+        ensure(quiz && body.answer === quiz.correct, 'Try another answer.');
+        const points = fanEra(user)?.multiplier === 1.5 ? 15 : 10;
+        credit(user, `og-quiz:${quiz.id}`, quiz.name, points, log);
+        return { message: `Throwback task complete. +${points} points.` };
+      }
+      case 'weekly-claim': {
+        ensure(user.demo || user.googleSub, 'Verify with Google to claim weekly rewards.', 403);
+        const weekly = weeklyProgress(user);
+        const task = weekly.tasks.find(item => item.id === body.task);
+        ensure(task && task.progress >= task.goal && !task.claimed, 'This weekly quest is not ready to claim.', 409);
+        credit(user, `weekly:${weekly.week}:${task.id}`, task.name, rewardRules.weekly, log);
+        return { message: `Weekly quest complete. +${rewardRules.weekly} points.` };
+      }
+      case 'weekly-chest': {
+        ensure(user.demo || user.googleSub, 'Verify with Google to claim weekly rewards.', 403);
+        const weekly = weeklyProgress(user);
+        ensure(weekly.chestReady && !weekly.chestClaimed, 'Finish and claim two weekly quests first.', 409);
+        credit(user, `weekly-chest:${weekly.week}`, 'Weekly chest', rewardRules.weeklyChest, log);
+        return { message: `Weekly chest opened. +${rewardRules.weeklyChest} points.` };
+      }
       case 'read-notice': {
         const notice = user.inbox?.find(item => item.id === body.id);
         ensure(notice, 'Notification not found.', 404);
@@ -584,7 +722,7 @@ async function mutate(req, res, action, key) {
         ensure(inChallenge(user), 'Your challenge has ended.');
         ensure(user.demo || user.googleSub || (demo && dailyPatch.sample), 'Verify with Google to earn redeemable points.', 403);
         credit(user, `daily:${new Date().toISOString().slice(0, 10)}`, `Daily meta pick · ${body.weapon}`, rewardRules.daily, log);
-        finishDemoReferral(data, user, log);
+        finishPreviewReferral(data, user, log);
         return { message: `Daily meta pick recorded. +${rewardRules.daily} pts.` };
       }
       case 'check-in':
@@ -595,14 +733,24 @@ async function mutate(req, res, action, key) {
         if (action === 'trivia') ensure(body.answer === quiz.correct, 'Try another answer.');
         const points = action === 'trivia' ? rewardRules.trivia : rewardRules.checkIn;
         credit(user, `${action}:${quiz.date}`, action === 'trivia' ? 'Daily archive trivia' : 'Daily check-in', points, log);
-        finishDemoReferral(data, user, log);
+        awardDailyCompletion(user, log);
+        finishPreviewReferral(data, user, log);
         return { message: `Mission complete. +${points} points.` };
+      }
+      case 'watch-task': {
+        ensure(user.demo || user.googleSub, 'Verify with Google to earn watch task points.', 403);
+        const date = utcDate();
+        ensure(user.watchedClips?.some(item => item.at.slice(0, 10) === date), 'Open a highlight from the gallery or news first.', 409);
+        credit(user, `watch-task:${date}`, 'Daily highlight discovery', rewardRules.watch, log);
+        awardDailyCompletion(user, log);
+        finishPreviewReferral(data, user, log);
+        return { message: `Highlight task complete. +${rewardRules.watch} points.` };
       }
       case 'archive-quiz': {
         ensure(demo || user.demo || user.googleSub, 'Verify with Google to earn rewards.', 403);
         ensure(body.year === starterQuiz.correct, 'Try again. The hint is in the first mission.');
         credit(user, 'archive-quiz', 'First ILLCAMS archive challenge', rewardRules.archive, log);
-        finishDemoReferral(data, user, log);
+        finishPreviewReferral(data, user, log);
         return { message: `Archive challenge solved. +${rewardRules.archive} pts.` };
       }
       case 'comeback': {
@@ -729,13 +877,17 @@ async function trackChecks() {
 const vendorFiles = {
   '/vendor/react.js': ['react/umd/react.production.min.js', 'react@18.3.1/umd/react.production.min.js', 'text/javascript; charset=utf-8'],
   '/vendor/react-dom.js': ['react-dom/umd/react-dom.production.min.js', 'react-dom@18.3.1/umd/react-dom.production.min.js', 'text/javascript; charset=utf-8'],
-  '/vendor/tailwind.css': ['tailwindcss/dist/tailwind.min.css', 'tailwindcss@2.2.19/dist/tailwind.min.css', 'text/css; charset=utf-8']
+  '/vendor/tailwind.css': ['tailwindcss/dist/tailwind.min.css', 'tailwindcss@2.2.19/dist/tailwind.min.css', 'text/css; charset=utf-8'],
+  '/vendor/chart.js': ['chart.js/dist/chart.umd.js', 'chart.js@4.5.1/dist/chart.umd.js', 'text/javascript; charset=utf-8']
 };
 const assets ={ '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/style.css': ['style.css', 'text/css; charset=utf-8'], '/arena.png': ['arena.png', 'image/png'], '/hero.png': ['hero.png', 'image/png'], '/hero.mp4': ['hero.mp4', 'video/mp4'] };
-for (const file of ['club-bootstrap.js', 'afterimage.js', 'club-ui.js', 'club-pages.js', 'rewards-ui.js', 'shop-ui.js', 'gallery-data.js', 'esports-data.js', 'shop-data.js']) {
+for (const file of ['club-bootstrap.js', 'clan.js', 'club-ui.js', 'club-pages.js', 'rewards-ui.js', 'shop-ui.js', 'gallery-data.js', 'esports-data.js', 'shop-data.js', 'teams-data.js', 'teams-page.js', 'about-data.js', 'about-page.js', 'player-page.js', 'floating.js']) {
   assets['/' + file] = [file, 'text/javascript; charset=utf-8'];
 }
-assets['/afterimage.css'] = ['afterimage.css', 'text/css; charset=utf-8'];
+assets['/clan.css'] = ['clan.css', 'text/css; charset=utf-8'];
+assets['/clan-features.css'] = ['clan-features.css', 'text/css; charset=utf-8'];
+assets['/images/media-placeholder.svg'] = ['images/media-placeholder.svg', 'image/svg+xml'];
+assets['/images/games/smash.svg'] = ['images/games/smash.svg', 'image/svg+xml'];
 assets['/hero-placeholder.mp4'] = ['hero-placeholder.mp4', 'video/mp4'];
 assets['/experience.js'] = ['experience.js', 'text/javascript; charset=utf-8'];
 assets['/experience.css'] = ['experience.css', 'text/css; charset=utf-8'];
@@ -744,6 +896,8 @@ for (const [file, mime] of [['logo.png', 'image/png'], ['tiger.jpg', 'image/jpeg
   assets[`/brand/${file}`] = [`brand/${file}`, mime];
 }
 const json = (res, status, payload) => res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }).end(JSON.stringify(payload));
+const inlineThemeScript = (await readFile(new URL('./public/index.html', import.meta.url), 'utf8')).match(/<script id="theme-bootstrap">([\s\S]*?)<\/script>/)?.[1] || '';
+const inlineThemeHash = createHash('sha256').update(inlineThemeScript).digest('base64');
 
 async function streamVideo(req, res, path) {
   const { size } = await stat(path);
@@ -779,7 +933,7 @@ const server = createServer(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'self' https://cdn.jsdelivr.net; font-src 'self'; img-src 'self' https:; media-src 'self' https:; frame-src https://www.youtube-nocookie.com; script-src 'self' https://cdn.jsdelivr.net; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+  res.setHeader('Content-Security-Policy', `default-src 'self'; style-src 'self' https://cdn.jsdelivr.net; font-src 'self'; img-src 'self' https:; media-src 'self' https:; frame-src https://www.youtube-nocookie.com; script-src 'self' 'sha256-${inlineThemeHash}' https://cdn.jsdelivr.net; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`);
   try {
     const url = new URL(req.url, origin);
     const key = sessionKey(req);
@@ -798,12 +952,13 @@ const server = createServer(async (req, res) => {
         res.writeHead(204).end();
         return;
       }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Afterimage email preferences</title><link rel="stylesheet" href="/style.css"><main><section class="panel pad flow"><h1>Afterimage email preferences</h1><p>Turn off email updates for this account.</p><form action="/mail/unsubscribe?token=${unsubscribe}" method="post"><button class="btn primary" type="submit">Unsubscribe</button></form></section></main></html>`);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Clan email preferences</title><link rel="stylesheet" href="/style.css"><main><section class="panel pad flow"><h1>Clan email preferences</h1><p>Turn off email updates for this account.</p><form action="/mail/unsubscribe?token=${unsubscribe}" method="post"><button class="btn primary" type="submit">Unsubscribe</button></form></section></main></html>`);
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/matches/import') return json(res, 200, await importMatch(req));
     if (req.method === 'POST' && url.pathname.startsWith('/api/')) return json(res, 200, await mutate(req, res, url.pathname.slice(5), key));
-    const asset = Object.hasOwn(assets, url.pathname) ? assets[url.pathname] : null;
+    const spa = ['/about', '/teams', '/clan', '/terms', '/privacy'].includes(url.pathname) || /^\/players\/[a-z0-9-]+$/.test(url.pathname);
+    const asset = Object.hasOwn(assets, url.pathname) ? assets[url.pathname] : spa ? assets['/'] : null;
     if (asset?.[1] === 'video/mp4' && ['GET', 'HEAD'].includes(req.method)) {
       try { return await streamVideo(req, res, new URL(`./public/${asset[0]}`, import.meta.url)); }
       catch (error) {
@@ -812,6 +967,11 @@ const server = createServer(async (req, res) => {
       }
     }
     ensure(req.method === 'GET', 'Method not allowed.', 405);
+    if (/^\/images\/players\/[a-z0-9-]+\/[a-z0-9-]+\.webp$/.test(url.pathname)) {
+      const file = new URL('./public' + url.pathname, import.meta.url);
+      if (existsSync(file)) return res.writeHead(200, { 'Content-Type': 'image/webp' }).end(await readFile(file));
+      return res.writeHead(200, { 'Content-Type': 'image/svg+xml' }).end(await readFile(new URL('./public/images/media-placeholder.svg', import.meta.url)));
+    }
     if (url.pathname === '/health') {
       await store.read();
       return json(res, 200, { ok: true, database: store.name, demo });
@@ -831,18 +991,19 @@ const server = createServer(async (req, res) => {
         return json(res, 200, { id, name: user.name, category: fanCategory(user), ...fanWallet(user), created: user.created, links: user.links, ledger: user.ledger, performance: playerPerformance(data, user), journey: engagement(user) });
       }
       const fans = Object.values(data.users).filter(user => user.persona).map(user => ({
-        id: user.id, name: user.name, category: fanCategory(user).name, ...fanWallet(user), games: [...new Set([...Object.keys(user.links), ...gameProfile(user).map(entry => entry.game)])]
+        id: user.id, name: user.name, category: user.personaType, ...fanWallet(user), games: [...new Set([...Object.keys(user.links), ...gameProfile(user).map(entry => entry.game)])]
       }));
-      return json(res, 200, { groups: categories.map(([name]) => name), fans });
+      return json(res, 200, { groups: ['Normal User', 'New User', 'Returning User', 'Streamer'], fans });
     }
     if (url.pathname === '/api/state') {
       let data = await store.read();
       const user = current(data, key);
-      if (user && (!user.lastVisitAt || Date.now() - user.lastVisitAt >= 5 * 60_000)) {
+      if (user && (!user.lastVisitAt || Date.now() - user.lastVisitAt >= 5 * 60_000 || user.accountType !== accountType(user))) {
         data = await store.write(updated => {
           const active = current(updated, key);
           if (active) {
             syncNotices(active);
+            active.accountType = accountType(active);
             active.lastVisitAt = Date.now();
           }
           return updated;
@@ -860,6 +1021,10 @@ const server = createServer(async (req, res) => {
     if (['/auth/google', '/auth/google/callback'].includes(url.pathname)) {
       limit(req, 'oauth', 40);
       return await googleFlow(req, res, url, key);
+    }
+    if (['/auth/discord', '/auth/discord/callback'].includes(url.pathname)) {
+      limit(req, 'oauth', 40);
+      return await discordFlow(req, res, url, key);
     }
     if (['/member-video', '/rewind-video'].includes(url.pathname)) {
       const data = await store.read();
@@ -916,11 +1081,11 @@ if (mailConfigured(origin)) {
     if (processing) return;
     processing = true;
     try { await deliverNotices(store, origin); }
-    catch { console.warn('Replay email processing will retry.'); }
+    catch { console.warn('FaZe email processing will retry.'); }
     finally { processing = false; }
   };
   setInterval(sendPending, 60_000).unref();
   void sendPending();
 }
 
-server.listen(port, process.env.HOST || '127.0.0.1', () => console.log(`FaZe Afterimage ready at ${origin} · ${store.name}${demo ? ' · demo enabled' : ''}`));
+server.listen(port, process.env.HOST || '127.0.0.1', () => console.log(`FaZe Clan ready at ${origin} · ${store.name}${demo ? ' · demo enabled' : ''}`));

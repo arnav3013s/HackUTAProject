@@ -1,10 +1,10 @@
 function loadError() {
   const status = document.querySelector('#club-root p');
-  if (status) status.textContent = 'Could not load FaZe Afterimage. Check your connection and reload.';
+  if (status) status.textContent = 'Could not load FaZe Clan. Check your connection and reload.';
 }
 
 if (window.React && window.ReactDOM) {
-  import('./afterimage.js').catch(error => {
+  import('./clan.js').catch(error => {
     console.error(error);
     loadError();
   });
