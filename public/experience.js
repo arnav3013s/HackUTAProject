@@ -220,7 +220,7 @@ export function invitesExperience(state) {
     <p>${user.demo ? 'To try the full referral, open this link in a private browser window, start a new demo account, and complete a mission.' : 'Share this link with a friend so Replay can credit the referral when they qualify.'}</p>
     <div class="copy-field"><input readonly aria-label="Your invite link" value="${e(link)}"><button class="btn primary" data-copy="${e(link)}">Copy link</button></div></div>
     <div class="invite-counts"><div><strong>${approved}/${r.referralCap}</strong><span>APPROVED</span></div><div><strong>${pending}</strong><span>PENDING</span></div><div><strong>${approved * r.referral}</strong><span>POINTS EARNED</span></div></div>
-  </section>` : `<section class="panel invite-work"><div><h2>Get your personal link</h2><p>It’s generated when you join Replay.</p></div>${btn('Start walkthrough', '#welcome', 'primary')}</section>`}
+  </section>` : `<section class="panel invite-work"><div><h2>Get your personal link</h2><p>It’s generated when you join Afterimage.</p></div>${btn('Start walkthrough', '#welcome', 'primary')}</section>`}
   <div class="invite-steps">
     <article><strong>1. Share</strong><p>Copy your link and send it to a friend.</p></article>
     <article><strong>2. They play</strong><p>${user?.demo || !user && state.config.demo ? 'A demo friend qualifies after their first mission.' : `Both fans verify their accounts. Your friend must play on ${r.referralTasks} different days and be signed up for ${r.minAge} days before review.`}</p></article>
@@ -241,7 +241,7 @@ export function inboxExperience(state, showPreview) {
     message: 'Your daily missions are ready. Check in, answer the archive question, and see your points when you return.',
     route: '#missions'
   };
-  const preview = showPreview ? `<article class="mail-preview"><p class="club-kicker">EMAIL PREVIEW</p><h3>FaZe Replay · ${e(notice.title)}</h3><p>${e(notice.message)}</p>${btn('Open missions', notice.route, 'primary')}<p class="dim">Unsubscribe from email updates at any time.</p></article>` : '';
+  const preview = showPreview ? `<article class="mail-preview"><p class="club-kicker">EMAIL PREVIEW</p><h3>FaZe Afterimage · ${e(notice.title)}</h3><p>${e(notice.message)}</p>${btn('Open missions', notice.route, 'primary')}<p class="dim">Unsubscribe from email updates at any time.</p></article>` : '';
   return `${title('Inbox', 'See who joined your squad, what you earned, and when there’s a reason to come back.')}
   ${!user ? `<section class="panel invite-work"><p>Your inbox is part of your fan profile.</p>${btn('Open an account', '#account', 'primary')}</section>`
     : `<div class="inbox-grid">

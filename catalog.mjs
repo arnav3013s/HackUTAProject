@@ -1,6 +1,6 @@
 export const games = ['Counter-Strike 2', 'Call of Duty: Warzone', 'Rainbow Six Siege', 'Valorant', 'Apex Legends', 'Fortnite'];
 
-export const rewardRules = { daily: 15, checkIn: 5, trivia: 10, archive: 20, days: 21, referral: 40, referralCap: 5, minAge: 7, referralTasks: 3, review: 25, reviewCap: 10, returning: 30, creator: 5, merchCap: 2, demoBalance: 200 };
+export const rewardRules = { daily: 15, checkIn: 5, trivia: 10, archive: 20, days: 21, referral: 40, referralWelcome: 20, referralCap: 5, minAge: 7, referralTasks: 3, review: 25, reviewCap: 10, returning: 30, creator: 5, merchCap: 2, demoBalance: 200 };
 export const matchRules = { minutesPerPoint: 5, timeCap: 10, placementCap: 20, dailyCap: 60, recentDays: 30, rankedMatches: 3, minimumMinutes: 5, rewardWindowDays: 7 };
 
 export const creators = [

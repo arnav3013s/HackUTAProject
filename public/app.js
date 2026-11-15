@@ -1,24 +1,12 @@
-import { e, n, homeExperience, inboxExperience, invitesExperience, missionsExperience, preferencesForm, renderStatus, walkthroughExperience } from '/experience.js';
+import { e, n, inboxExperience, preferencesForm, renderStatus, walkthroughExperience } from '/experience.js';
 
-const main = document.querySelector('main');
+const main = document.querySelector('#legacy-main');
 const notice = document.querySelector('#notice');
-const navigation = [
-  ['home', 'Home'], ['missions', 'Missions'], ['invites', 'Invites'], ['news', 'Watch'], ['rewards', 'Rewards']
-];
-const moreNavigation = [
-  ['performance', 'Match activity'], ['patches/pro-reviews', 'Patch intel & pro reviews'], ['teams', 'Teams & players'],
-  ['leaderboard', 'Tournament results'], ['archive', 'FaZe timeline'], ['creators', 'Creator gallery'],
-  ['shop', 'Official shop'], ['fans', 'Fan Lab']
-];
-const navGroups = {
-  news: [['news', 'Trending this week'], ['news/all-time', 'Trending all time'], ['news/og', 'OG archive'], ['news/publishers', 'Publisher feeds']],
-  rewards: [['rewards', 'My wallet'], ['rewards/points-shop', 'Redeem points'], ['rewards/receipts', 'My receipts']]
-};
 const invitation = () => new URLSearchParams(location.search).get('invite') || '';
 const pages = {
-  home: () => homeExperience(data), welcome: () => walkthroughExperience(data, invitation(), walkStep), ask, fans, tracks, patches,
-  missions: () => missionsExperience(data), invites: () => invitesExperience(data), inbox: () => inboxExperience(data, emailPreview),
-  news: newsPage, creators: gallery, teams, archive, leaderboard, shop, rewards, account, performance
+  welcome: () => walkthroughExperience(data, invitation(), walkStep), ask, fans, tracks, patches,
+  inbox: () => inboxExperience(data, emailPreview),
+  watch: newsPage, creators: gallery, teams, archive, leaderboard, receipts: rewards, account, performance
 };
 let data, noticeTimer;
 let game = 'All games', league = 'All leagues', patchId = '', history = [], authMode = 'signup';
@@ -32,7 +20,7 @@ const attempts = new Map();
 let matchAttempt;
 const web = value => /^https:\/\//i.test(value || '') ? e(value) : '';
 const locationParts = () => location.hash.slice(1).split('/');
-const route = () => Object.hasOwn(pages, locationParts()[0]) ? locationParts()[0] : 'home';
+const route = () => Object.hasOwn(pages, locationParts()[0]) ? locationParts()[0] : '';
 const selectedPatch = () => data.patches.find(item => item.id === patchId)
   || data.patches.find(item => Boolean(item.sample) === Boolean(data.user?.demo)) || data.patches[0];
 const section = (title, body, extra = '', id = '') => `<section class="panel"${id ? ` id="${e(id)}" tabindex="-1"` : ''}><div class="panel-head"><h2>${e(title)}</h2>${extra}</div>${body}</section>`;
@@ -66,8 +54,8 @@ async function request(path, fields) {
 
 async function refresh() {
   const page = route();
-  if (page === 'news') clipFilter = ({ 'all-time': 'total', og: 'og' })[locationParts()[1]] || 'week';
-  const getActivity = ['news', 'tracks'].includes(page);
+  if (page === 'watch') clipFilter = ({ 'all-time': 'total', og: 'og' })[locationParts()[1]] || 'week';
+  const getActivity = ['watch', 'tracks'].includes(page);
   const [state, existingActivity] = await Promise.all([request('/api/state'), getActivity ? request('/api/activity') : activity]);
   data = state;
   activity = existingActivity;
@@ -89,7 +77,7 @@ function rankings(patch, limit) {
 }
 
 const offsite = (url, label, classes = '') => `<a class="${e(classes)}" href="${web(url)}" target="_blank" rel="noopener noreferrer">${e(label)} ↗</a>`;
-const clipTile = (clip, count) => `<article class="media-tile"><button data-play-clip="${e(clip.id)}" class="thumb" aria-label="Play ${e(clip.title)}"><img src="${web(clip.image)}" alt="" loading="lazy"><span aria-hidden="true">▶</span></button><div class="media-copy"><p class="eyebrow">${e(clip.channel)} / ${e(clip.year)}</p><h3>${e(clip.title)}</h3>${count !== undefined ? `<p class="dim">${n(count)} opens in Replay</p>` : ''}<button class="btn quiet" data-play-clip="${e(clip.id)}">Play highlight</button></div></article>`;
+const clipTile = (clip, count) => `<article class="media-tile"><button data-play-clip="${e(clip.id)}" class="thumb" aria-label="Play ${e(clip.title)}"><img src="${web(clip.image)}" alt="" loading="lazy"><span aria-hidden="true">▶</span></button><div class="media-copy"><p class="eyebrow">${e(clip.channel)} / ${e(clip.year)}</p><h3>${e(clip.title)}</h3>${count !== undefined ? `<p class="dim">${n(count)} opens in Afterimage</p>` : ''}<button class="btn quiet" data-play-clip="${e(clip.id)}">Play highlight</button></div></article>`;
 const clipCount = (clip, window) => activity.clips.find(row => row.subject === clip.id)?.[window] || 0;
 function rankedClips(window) {
   const clips = data.faze.videos.slice();
@@ -130,11 +118,11 @@ function newsPage() {
   const patches = data.patches.filter(item => !item.sample);
   const updates = patches.length ? patches.slice(0, 3) : data.patches.filter(item => item.sample).slice(0, 1);
   return intro('Watch & news', 'Watch FaZe uploads and follow the publishers behind the games.') +
-    section('FaZe video archive', `<div class="pad flow"><div class="actions">${clipButtons.map(([id,label]) => `<button class="btn ${clipFilter === id ? 'selected' : ''}" aria-pressed="${clipFilter === id}" data-clip-filter="${id}">${label}</button>`).join('')}</div><p class="dim">${clipFilter === 'og' ? 'Original uploads from the early trickshot years.' : `Ranked by unique clip opens in Replay ${clipFilter === 'week' ? 'over the last seven days' : 'since tracking began'}.${data.config.demo ? ' Includes demo activity.' : ''}`}</p><div class="tile-grid">${rankedClips(clipFilter).map(clip => clipTile(clip, clipFilter === 'og' ? undefined : clipCount(clip, clipFilter))).join('')}</div></div>`, offsite(data.faze.channel, 'FaZe on YouTube', 'subtle')) +
+    section('FaZe video archive', `<div class="pad flow"><div class="actions">${clipButtons.map(([id,label]) => `<button class="btn ${clipFilter === id ? 'selected' : ''}" aria-pressed="${clipFilter === id}" data-clip-filter="${id}">${label}</button>`).join('')}</div><p class="dim">${clipFilter === 'og' ? 'Original uploads from the early trickshot years.' : `Ranked by unique clip opens in Afterimage ${clipFilter === 'week' ? 'over the last seven days' : 'since tracking began'}.${data.config.demo ? ' Includes demo activity.' : ''}`}</p><div class="tile-grid">${rankedClips(clipFilter).map(clip => clipTile(clip, clipFilter === 'og' ? undefined : clipCount(clip, clipFilter))).join('')}</div></div>`, offsite(data.faze.channel, 'FaZe on YouTube', 'subtle')) +
     (updates.length ? section(patches.length ? 'Recent patch coverage' : 'Try patch intel', `<div class="pad tile-grid">${updates.map(item => `<article class="tile team-tile"><p class="eyebrow">${e(item.version)}</p><h3>${e(item.game)}</h3><p>${e(item.summary)}</p><div><button class="btn quiet" data-patch-open="${e(item.id)}">Read analysis</button></div></article>`).join('')}</div>`) : '') +
     section('Publisher feeds', `<div class="pad tile-grid">${data.news.map(item => `<a class="tile news-tile" href="${web(item.url)}" target="_blank" rel="noopener noreferrer">${pill(item.name)}<h3>${e(item.title)} ↗</h3><p>${e(item.kind)} updates</p></a>`).join('')}</div>`, '', 'publishers') +
     (data.clips.length ? section('Trending clips', `<div class="pad tile-grid">${data.clips.map(clip => `<a class="tile news-tile" href="${web(clip.url)}" target="_blank" rel="noopener noreferrer">${pill(clip.game)}<h3>${e(clip.title)} ↗</h3><p>${e(clip.creator)}</p></a>`).join('')}</div>`) : '') +
-    (data.user?.journey.rewind ? section('Your Replay rewind', `<div class="pad flow"><p>${e(data.user.journey.rewind)}</p>${data.user.rewindVideo ? '<video controls preload="metadata" src="/rewind-video"></video>' : ''}<a class="subtle" href="#performance">See your match history ↗</a></div>`) : '');
+    (data.user?.journey.rewind ? section('Your match rewind', `<div class="pad flow"><p>${e(data.user.journey.rewind)}</p>${data.user.rewindVideo ? '<video controls preload="metadata" src="/rewind-video"></video>' : ''}<a class="subtle" href="#performance">See your match history ↗</a></div>`) : '');
 }
 
 function archive() {
@@ -169,10 +157,10 @@ function assistantSource(source) {
 
 function ask() {
   const questions = ['What should I do today?', 'Why am I a returning fan?', 'When do I get my invite points?', 'Why is MP9 in its tier?', 'How do I submit a pro review?'];
-  return intro('Ask Replay', 'Get a recommendation from your activity, work out your points, or ask about a pro review.') +
+  return intro('Ask Afterimage', 'Get a recommendation from your activity, work out your points, or ask about a pro review.') +
     section('Fan assistant', `<div class="pad assistant-layout"><div class="actions prompts">${questions.map(question => `<button class="btn" data-question="${e(question)}">${e(question)}</button>`).join('')}</div>
-      <div class="chat" aria-live="polite">${chat.length ? chat.map(turn => `<article class="chat-turn"><p class="chat-user"><strong>You</strong> · ${e(turn.question)}</p><div class="chat-answer"><span class="eyebrow">${e(turn.mode || 'Replay')}</span><p class="prose">${e(turn.answer || 'Looking up your question…')}</p>${turn.status ? `<p class="dim">${e(turn.status)}</p>` : ''}<div class="actions">${turn.action === 'check-in' && !data.user?.journey.cards[0].done ? '<button class="btn primary" data-post="check-in">Claim check-in points</button>' : ''}${turn.action === 'comeback' && data.user?.journey.comeback ? '<button class="btn primary" data-post="comeback">Claim comeback points</button>' : ''}${(turn.sources || []).map(assistantSource).join('')}</div></div></article>`).join('') : '<p class="dim">Pick a question above or ask your own.</p>'}</div>
-      ${form('ask', input('Your question', 'question', 'text', 'maxlength="500" placeholder="What’s trending this week?"'), 'Ask Replay')}
+      <div class="chat" aria-live="polite">${chat.length ? chat.map(turn => `<article class="chat-turn"><p class="chat-user"><strong>You</strong> · ${e(turn.question)}</p><div class="chat-answer"><span class="eyebrow">${e(turn.mode?.replace('Replay guide','Afterimage guide') || 'Replay')}</span><p class="prose">${e(turn.answer || 'Looking up your question…')}</p>${turn.status ? `<p class="dim">${e(turn.status)}</p>` : ''}<div class="actions">${turn.action === 'check-in' && !data.user?.journey.cards[0].done ? '<button class="btn primary" data-post="check-in">Claim check-in points</button>' : ''}${turn.action === 'comeback' && data.user?.journey.comeback ? '<button class="btn primary" data-post="comeback">Claim comeback points</button>' : ''}${(turn.sources || []).map(assistantSource).join('')}</div></div></article>`).join('') : '<p class="dim">Pick a question above or ask your own.</p>'}</div>
+      ${form('ask', input('Your question', 'question', 'text', 'maxlength="500" placeholder="What’s trending this week?"'), 'Ask Afterimage')}
     </div>`, pill(data.config.gemini ? 'Gemini configured' : 'Database guide'));
 }
 
@@ -197,7 +185,7 @@ function profileGames(profile) {
     <div class="profile-metrics">
       <div><span>Played</span><strong>${n(game.minutes)} min</strong><small>${game.matches} matches</small></div>
       <div><span>Avg. placement score</span><strong>${game.performance}/100</strong><small>${game.wins} wins</small></div>
-      <div><span>Best finish</span><strong>${game.best.placement} / ${game.best.fieldSize}</strong><small>${game.rank ? `Replay rank #${game.rank} of ${game.rankedFans}` : `Rank after ${data.matchRules.rankedMatches} matches`}</small></div>
+      <div><span>Best finish</span><strong>${game.best.placement} / ${game.best.fieldSize}</strong><small>${game.rank ? `Afterimage rank #${game.rank} of ${game.rankedFans}` : `Rank after ${data.matchRules.rankedMatches} matches`}</small></div>
     </div>
   </article>`).join('')}</div>`;
 }
@@ -223,7 +211,7 @@ function performance() {
       `<div class="match-fields">${input('Minutes played', 'minutes', 'number', 'min="1" max="360" value="35"')}
       ${input('Finishing position', 'placement', 'number', 'min="1" max="256" value="3"')}
       ${input('Players or teams in the field', 'fieldSize', 'number', 'min="2" max="256" value="20"')}</div>`, 'Record demo match')}
-    </div>`) : section('Link a game', `<div class="pad flow"><p>Save your game handle in Account. Results appear when Replay receives them from a trusted match feed.</p><div><a class="btn" href="#account">Open account ↗</a></div></div>`);
+    </div>`) : section('Link a game', `<div class="pad flow"><p>Save your game handle in Account. Results appear when Afterimage receives them from a trusted match feed.</p><div><a class="btn" href="#account">Open account ↗</a></div></div>`);
   return intro('My match activity', `Your last ${r.recentDays} days of play, with the score and points behind each result.`) +
     `<div class="next-play"><div><p class="eyebrow">${e(user.category.name)}${mainGame ? ` · ${e(mainGame)}` : ''}</p><strong>${e(user.category.explanation)}</strong></div><a class="btn" href="#rewards">Open wallet ↗</a></div>` +
     section('Game profile', profileGames(user.performance)) +
@@ -246,15 +234,15 @@ function tracks() {
   const rows = [
     {
       name: 'Google Gemini', label: data.config.gemini ? 'API key configured' : 'API key needed',
-      task: 'Ask why MP9 has its tier. Replay retrieves the weapon record, then Gemini explains it and links you back to the evidence.',
-      setup: 'Set GEMINI_API_KEY on the server and restart. Try the question again and look for Gemini above the answer. Replay guide labels the available answer when Gemini is disconnected.',
+      task: 'Ask why MP9 has its tier. Afterimage retrieves the weapon record, then Gemini explains it and links you back to the evidence.',
+      setup: 'Set GEMINI_API_KEY on the server and restart. Try the question again and look for Gemini above the answer. Afterimage guide labels the available answer when Gemini is disconnected.',
       action: '<button class="btn" data-track-question>Try a Gemini question ↗</button>'
     },
     {
       name: 'Solana', label: status?.solana.slot ? `Finalized slot ${n(status.solana.slot)}` : status ? 'RPC could not be reached' : 'Checking Devnet…',
       task: 'Redeem an Intel Pass in the demo and open its receipt. The memo identifies your redemption.',
       setup: 'An operator with a funded Devnet signer runs npm run receipt -- <memo>. Paste the finalized signature into your receipt to check it and open it in Solana Explorer.',
-      action: '<a class="btn" href="#rewards/points-shop">Try a demo redemption ↗</a><a class="subtle" href="#rewards/receipts">My receipts ↗</a>'
+      action: '<a class="btn" href="#rewards/points-shop">Try a demo redemption ↗</a><a class="subtle" href="#receipts">My receipts ↗</a>'
     },
     {
       name: 'Tiger Data', label: status?.database.engine === 'Tiger Data' && status.database.available ? 'Tiger Data connected' : data.config.database === 'SQLite' ? 'SQLite demo' : 'Checking database…',
@@ -264,7 +252,7 @@ function tracks() {
     },
     {
       name: 'Vultr', label: status?.vultr.instance ? `${status.vultr.instance.region.toUpperCase()} · ${status.vultr.instance.power}` : status?.vultr.configured ? 'Instance check failed' : 'Local preview',
-      task: 'Open app health to see whether Replay and its database are responding. On a Vultr deployment, open that same check from the public site.',
+      task: 'Open app health to see whether Afterimage and its database are responding. On a Vultr deployment, open that same check from the public site.',
       setup: 'Set PUBLIC_ORIGIN and run Docker Compose on a Vultr Cloud Compute instance. VULTR_API_KEY and VULTR_INSTANCE_ID enable the instance check here.',
       action: '<a class="btn" href="/health" target="_blank" rel="noopener">Open app health ↗</a>'
     }
@@ -318,21 +306,8 @@ function leaderboard() {
 
 function rewards() {
   const user = data.user;
-  const rules = data.rewardRules;
-  return intro('Fan rewards', 'Complete challenges and earn points for campaign rewards. Points have no cash value.') +
-    (user ? wallet(user) : '<div><a class="btn primary" href="#welcome">Take the points walkthrough</a></div>') +
-    `<div class="actions" id="campaign" tabindex="-1"><a class="btn primary" href="#missions">Earn with daily missions</a><a class="btn quiet" href="#invites">Invite a friend · +${rules.referral} pts</a>${user ? '<a class="btn quiet" href="#rewards/ledger">Open points history</a>' : ''}</div>` +
-    section('Redeem points', `<div class="pad tile-grid">${data.products.map(item => {
-      const product = data.faze.merch.find(merch => merch.id === item.merch);
-      const redeemed = item.id === 'pass' && user?.member;
-      const eligible = item.available && !redeemed && (!item.demoOnly || user?.merchUsed < rules.merchCap);
-      const label = redeemed ? 'Activated' : !eligible ? 'Unavailable' : user?.balance < item.price ? 'Need more points' : item.demoOnly ? 'Test redemption' : 'Redeem';
-      return `<article class="tile product">${product ? merchImage(product) : '<div class="product-mark pass" aria-hidden="true">⌁</div>'}${pill(item.type)}
-    <h3>${e(item.name)}</h3><p>${item.id === 'pass' ? 'Early patch insights, loadout picks and member clips.' : 'Sample reward. This reservation uses demo points.'}</p>
-    <div class="tile-foot"><strong class="lime-text">${n(item.price)} pts</strong>
-    ${user ? `<button class="btn" data-post="redeem" data-product="${e(item.id)}" ${!eligible || user.balance < item.price ? 'disabled' : ''}>${label}</button>` : authLink()}</div></article>`;
-    }).join('')}</div>`, '<a class="subtle" href="#shop">Official gear ↗</a>', 'points-shop') +
-    (user ? section('Points history', pointsHistory(user), '', 'ledger') : '') +
+  return intro('Redemptions and receipts', 'View your unlocked rewards and verify eligible Solana receipts.') +
+    '<div class="actions"><a class="btn" href="#rewards/redeem">Back to Rewards</a></div>' +
     (user?.member ? section('Intel Pass', `<div class="pad flow"><p class="prose">${e(user.memberIntel || 'Member loadout intel is awaiting publication.')}</p>${data.config.memberVideo ? '<a class="btn" href="/member-video">Watch member video ↗</a>' : '<p class="dim">Member videos are awaiting publication.</p>'}</div>`, pill('Active', 'lime')) : '') +
     section('Redemptions & receipts', user?.sponsoredOrders.length ? `<div class="pad flow">${user.sponsoredOrders.map(order => `<article class="review"><div class="row"><strong>${e(order.name)}</strong>${pill(user.demo && order.product !== 'pass' ? 'Sample reservation' : order.status)}</div>
     ${order.signature ? `<a href="https://explorer.solana.com/tx/${encodeURIComponent(order.signature)}?cluster=devnet" target="_blank" rel="noopener noreferrer">View finalized receipt ↗</a>` : order.memo ?
@@ -343,13 +318,13 @@ function account() {
   const user = data.user;
   const invite = new URLSearchParams(location.search).get('invite') || '';
   const google = `/auth/google?invite=${encodeURIComponent(invite)}`;
-  if (!user) return intro('Join FaZe Replay', 'Create your fan profile to join challenges and earn rewards.') +
+  if (!user) return intro('Join FaZe Afterimage', 'Create your fan profile to join challenges and earn rewards.') +
     section(authMode === 'signup' ? 'Create your account' : 'Sign in', `<div class="pad flow auth-form">
       <div class="actions"><button class="btn ${authMode === 'signup' ? 'selected' : ''}" data-auth="signup">Create account</button><button class="btn ${authMode === 'login' ? 'selected' : ''}" data-auth="login">Sign in</button></div>
       ${form(authMode, (authMode === 'signup' ? input('Display name', 'name', 'text', 'maxlength="40"') : '') + input('Email', 'email', 'email', 'autocomplete="email" maxlength="254"') +
       input('Password', 'password', 'password', `autocomplete="${authMode === 'signup' ? 'new-password' : 'current-password'}" minlength="10" maxlength="128"`) +
       (authMode === 'signup' ? `<label>Invite code <span class="dim">(optional)</span><input name="invite" maxlength="20" value="${e(invite)}"></label>` : ''), authMode === 'signup' ? 'Create account' : 'Sign in')}
-      <div class="actions">${data.config.google ? `<a class="btn" href="${google}">Continue with Google ↗</a>` : ''}${data.config.demo ? '<button class="btn" data-post="demo">Try the demo</button>' : ''}</div>
+      <div class="actions">${data.config.google ? `<a class="btn" href="${google}">Continue with Google ↗</a>` : ''}${data.config.demo ? '<button class="btn" data-post="demo">Try a demo account</button>' : ''}</div>
     </div>`);
   return intro(user.name, `${n(user.balance)} points available · ${user.demo ? 'Demo account' : 'Fan account'}`) +
     `<div class="next-play"><div><p class="eyebrow">${e(user.category.name)}</p><strong>${e(user.journey.reason)}</strong></div><div class="actions"><button class="btn" data-why>Why this status?</button><a class="btn" href="#performance">My match activity ↗</a></div></div>` +
@@ -369,47 +344,32 @@ function account() {
 
 function render() {
   const active = route();
-  const links = items => items.map(([id, label]) => `<a href="#${id}" ${id === locationParts().join('/') ? 'aria-current="page"' : ''}>${e(label)}</a>`).join('');
-  document.querySelector('#nav').innerHTML = navigation.map(([id, label]) => {
-    const link = `<a class="nav-link" href="#${id}" ${active === id ? 'aria-current="page"' : ''}>${e(label)}</a>`;
-    return navGroups[id] ? `<div class="nav-with-menu">${link}<details class="menu nav-sub"><summary aria-label="${e(label)} options">⌄</summary><div class="submenu">${links(navGroups[id])}</div></details></div>` : link;
-  }).join('') + `<details class="menu nav-more"><summary>More <span aria-hidden="true">⌄</span></summary><div class="submenu">${links(moreNavigation)}</div></details>`;
-  const count = data.user?.inbox.unread || 0;
-  const assistant = `<a class="assistant-link" href="#ask"${active === 'ask' ? ' aria-current="page"' : ''}><span aria-hidden="true">✦</span><span>Ask Replay</span></a>`;
-  const inbox = `<a class="inbox-link" href="#inbox" aria-label="Inbox${count ? `, ${count} unread` : ''}"><span>Inbox</span>${count ? `<span class="unread-count">${n(count)}</span>` : ''}</a>`;
-  document.querySelector('#account-buttons').innerHTML = assistant + (data.user ? `${inbox}<a class="points" href="#rewards">${n(data.user.balance)} <span>PTS</span></a><a class="user-chip" href="#account" aria-label="Account for ${e(data.user.name)}">${e(data.user.name.trim()[0]?.toUpperCase() || 'F')}</a>` :
-    `<a class="btn primary" href="#account">Sign in</a>`);
+  window.dispatchEvent(new CustomEvent('afterimage:state', { detail: data }));
+  if (!active || !main) return;
   main.innerHTML = pages[active]();
   for (const control of main.querySelectorAll('[data-filter]')) control.value = control.dataset.filter === 'game' ? game : league;
   const categorySelect = main.querySelector('[data-fan-filter]');
   if (categorySelect) categorySelect.value = fanFilter;
-  if (active === 'home' && data.user?.journey.stage === 'returning') {
-    const key = `replay-return:${data.user.id}`;
-    const occasion = data.user.journey.lastActivity || 'return';
-    if (sessionStorage.getItem(key) !== occasion) {
-      sessionStorage.setItem(key, occasion);
-      showWelcome(true);
-    }
-  }
+
 }
 
 function showWelcome(returning = false) {
   if (!data) return;
   const user = data.user;
   const r = data.rewardRules;
-  const heading = returning ? `Welcome back, ${user.name.split(' ')[0]}.` : 'Welcome to FaZe Replay.';
+  const heading = returning ? `Welcome back, ${user.name.split(' ')[0]}.` : 'Welcome to FaZe Afterimage.';
   const progress = returning ? user.journey.reason : 'Play daily missions and see each credit arrive in your points wallet.';
   const cta = returning
-    ? `<a class="btn primary" data-welcome-close href="#missions">${user.journey.comeback ? `See your +${user.journey.comeback} comeback bonus` : 'See today’s missions'} <span aria-hidden="true">→</span></a>`
+    ? `<a class="btn primary" data-welcome-close href="#rewards/earn">${user.journey.comeback ? `See your +${user.journey.comeback} comeback bonus` : 'See today’s missions'} <span aria-hidden="true">→</span></a>`
     : '<a class="btn primary" data-welcome-close href="#welcome">Start the walkthrough <span aria-hidden="true">→</span></a>';
   welcomeDialog.innerHTML = `<div class="welcome-modal">
     <button class="btn welcome-close" data-welcome-close autofocus aria-label="Close welcome">×</button>
-    <p class="club-kicker">${returning ? 'RETURNING FAN' : 'HOW REPLAY WORKS'}</p>
+    <p class="club-kicker">${returning ? 'RETURNING FAN' : 'HOW AFTERIMAGE WORKS'}</p>
     <h2 id="welcome-title">${e(heading)}</h2>
     <p>${e(progress)}</p>
     <div class="welcome-actions">
-      <a class="welcome-item" data-welcome-close href="#missions"><strong>Daily missions</strong><span>Check in for ${r.checkIn} points and play archive trivia for ${r.trivia} points.</span></a>
-      <a class="welcome-item" data-welcome-close href="#invites"><strong>Invite a friend</strong><span>Earn ${r.referral} points when someone joins from your link and qualifies.</span></a>
+      <a class="welcome-item" data-welcome-close href="#rewards/earn"><strong>Daily missions</strong><span>Check in for ${r.checkIn} points and play archive trivia for ${r.trivia} points.</span></a>
+      <a class="welcome-item" data-welcome-close href="#rewards/redeem"><strong>Invite a friend</strong><span>Earn ${r.referral} points when someone joins from your link and qualifies.</span></a>
       <a class="welcome-item" data-welcome-close href="#patches/pro-reviews"><strong>Pro reviews</strong><span>Creator playtests can change a weapon ranking. Eligible accepted reviews earn ${r.review} points.</span></a>
     </div>
     ${cta}
@@ -610,44 +570,6 @@ document.addEventListener('input', event => {
     document.querySelector('#roster-results').innerHTML = rosterResults();
   }
 });
-const nav = document.querySelector('#nav');
-const hoverInput = matchMedia('(hover: hover) and (pointer: fine)');
-nav.addEventListener('pointerover', event => {
-  const group = event.target.closest('.nav-with-menu, .nav-more');
-  const menu = group?.matches('.menu') ? group : group?.querySelector('.menu');
-  if (hoverInput.matches && event.pointerType === 'mouse' && menu && !group.contains(event.relatedTarget) && !menu.open) {
-    menu.dataset.hover = 'true';
-    menu.open = true;
-  }
-});
-nav.addEventListener('pointerout', event => {
-  const group = event.target.closest('.nav-with-menu, .nav-more');
-  const menu = group?.matches('.menu') ? group : group?.querySelector('.menu');
-  if (menu?.dataset.hover && !group.contains(event.relatedTarget)) {
-    delete menu.dataset.hover;
-    if (!menu.contains(document.activeElement)) menu.open = false;
-  }
-});
-nav.addEventListener('click', event => {
-  const summary = event.target.closest('summary');
-  if (summary?.parentElement.dataset.hover && event.detail > 0) {
-    event.preventDefault();
-    delete summary.parentElement.dataset.hover;
-  }
-});
-nav.addEventListener('toggle', event => {
-  if (event.target.open) for (const menu of document.querySelectorAll('.menu[open]')) if (menu !== event.target) menu.open = false;
-}, true);
-nav.addEventListener('keydown', event => {
-  if (event.key === 'Escape') {
-    const menu = event.target.closest('.menu');
-    if (menu) {
-      menu.open = false;
-      delete menu.dataset.hover;
-      menu.querySelector('summary').focus();
-    }
-  }
-});
 document.addEventListener('change', event => {
   if (event.target.hasAttribute('data-fan-filter')) {
     fanFilter = event.target.value;
@@ -661,19 +583,19 @@ document.addEventListener('change', event => {
   main.querySelector(`[data-filter="${event.target.dataset.filter}"]`)?.focus();
 });
 window.addEventListener('hashchange', async () => {
-  if (location.hash === '#content') return;
+  if (!route() || location.hash === '#content') return;
   try { await refresh(); render(); focusRoute(); if (route() === 'tracks') void checkTracks(); }
   catch (error) { flash(error.message, true); }
 });
 
 function focusRoute() {
-  if (welcomeDialog.open) return;
+  if (welcomeDialog.open || !route()) return;
   const section = document.getElementById(locationParts()[1]);
   if (section) {
     section.focus({ preventScroll: true });
     section.scrollIntoView();
   } else {
-    main.focus();
+    document.querySelector('#club-content')?.focus();
     window.scrollTo(0, 0);
   }
 }
