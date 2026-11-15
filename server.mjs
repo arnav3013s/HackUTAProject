@@ -49,7 +49,7 @@ function addUser(data, fields, invite, existingUserId) {
   const inviter = Object.values(data.users).find(candidate => candidate.invite === invite && !candidate.persona && Boolean(candidate.demo) === Boolean(user.demo));
   if (inviter && inviter.id !== existingUserId && inviter.id !== id) {
     data.referrals[id] = { inviter: inviter.id, invitee: id, status: 'pending', at: new Date().toISOString() };
-    addNotice(inviter, { id: `invite-joined-${id}`, title: 'A friend joined your invite', message: `${user.name} joined Replay. Approval will appear under Invites.`, route: '#invites' });
+    addNotice(inviter, { id: `invite-joined-${id}`, title: 'A friend joined your invite', message: `${user.name} joined Afterimage. Approval will appear under Rewards.`, route: '#rewards/redeem' });
   }
   syncNotices(user);
   return user;
@@ -67,12 +67,13 @@ const credit = (user, id, label, points, log) => {
 
 function approveReferral(referral, inviter, invitee, log) {
   credit(inviter, `referral:${invitee.id}`, 'Approved referral', rewardRules.referral, log);
+  credit(invitee, 'referral-welcome', 'Referral welcome bonus', rewardRules.referralWelcome, log);
   referral.status = 'approved';
   referral.approvedAt = new Date().toISOString();
   addNotice(inviter, {
     id: `invite-approved-${invitee.id}`, title: `+${rewardRules.referral} points from an invite`,
     message: `${invitee.name} completed the referral requirements. Your points are in your wallet.`,
-    route: '#invites', email: true
+    route: '#rewards/redeem', email: true
   });
 }
 
@@ -141,11 +142,11 @@ function publicState(data, user) {
     products: products.filter(item => !item.demoOnly || demo).map(({ cost, ...item }) => ({
       ...item,
       stock: data.inventory[item.id] ?? item.stock,
-      available: user?.demo || (!item.demoOnly && Boolean(user?.googleSub) && data.inventory[item.id] > 0 && data.remainingBudget >= cost)
+      available: user?.demo || (demo && Boolean(user) && item.id === 'pass') || (!item.demoOnly && Boolean(user?.googleSub) && data.inventory[item.id] > 0 && data.remainingBudget >= cost)
     })),
     standings: leagueEntries.map(({ name, game, league, score }) => ({ name, game, league, score })),
     clips,
-    config: { demo, google, email: mailConfigured(origin), gemini: Boolean(process.env.GEMINI_API_KEY), receiptAuthority: Boolean(process.env.SOLANA_RECEIPT_AUTHORITY), database: store.name, heroVideo: process.env.HERO_VIDEO_URL || '', memberVideo: Boolean(process.env.MEMBER_VIDEO_URL) }
+    config: { demo, google, email: mailConfigured(origin), gemini: Boolean(process.env.GEMINI_API_KEY), receiptAuthority: Boolean(process.env.SOLANA_RECEIPT_AUTHORITY), database: store.name, heroVideo: process.env.HERO_VIDEO_URL || '/hero-placeholder.mp4', memberVideo: Boolean(process.env.MEMBER_VIDEO_URL) }
   };
   if (!user) return result;
   const owned = Object.values(data.redemptions).filter(order => order.user === user.id);
@@ -163,7 +164,7 @@ function publicState(data, user) {
     journey, inbox: inboxView(user),
     referred: Boolean(data.referrals[user.id]),
     referrals: Object.values(data.referrals).filter(referral => referral.inviter === user.id).map(({ status, invitee, at, approvedAt }) => ({
-      status, name: data.users[invitee]?.name || 'Replay fan', at, approvedAt,
+      status, name: data.users[invitee]?.name || 'Afterimage fan', at, approvedAt,
       ...(data.users[invitee] ? referralMilestones(data.users[invitee]) : {})
     })),
     reviewQueue: isOperator(user) && !user.demo ? Object.values(data.referrals).filter(referral => referral.status === 'pending').map(referral => {
@@ -368,6 +369,17 @@ async function mutate(req, res, action, key) {
   ensure(req.headers.origin === origin, 'Request origin does not match the site.', 403);
   limit(req, 'write', 150);
   const body = await readBody(req);
+  if (action === 'newsletter') {
+    const email = clean(body.email, 254).toLowerCase();
+    ensure(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 'Enter a valid email.');
+    await store.write(data => {
+      data.newsletter ??= [];
+      if (!data.newsletter.some(entry => entry.email === email)) {
+        data.newsletter.push({ email, at: new Date().toISOString() });
+      }
+    });
+    return { message: 'You’re on the list.' };
+  }
   if (action === 'ask') {
     limit(req, 'assistant', 20);
     const question = clean(body.question, 500);
@@ -459,9 +471,17 @@ async function mutate(req, res, action, key) {
       ensure(name, 'Enter a display name.');
       const salt = token();
       const hash = (await scrypt(password, salt, 64)).toString('hex');
-      await startSession(res, data => {
+      await startSession(res, (data, log) => {
         ensure(!Object.values(data.users).some(user => user.email === email), 'An account already uses that email.', 409);
-        return addUser(data, { email, name, salt, hash }, clean(body.invite, 20).toUpperCase(), current(data, key)?.id);
+        const user = addUser(data, { email, name, salt, hash }, clean(body.invite, 20).toUpperCase(), current(data, key)?.id);
+        const referral = data.referrals[user.id];
+        if (demo && referral) {
+          const inviter = data.users[referral.inviter];
+          const earned = inviter.ledger.filter(entry => entry.id.startsWith('referral:')).length;
+          if (earned < rewardRules.referralCap) approveReferral(referral, inviter, user, log);
+          else referral.status = 'capped';
+        }
+        return user;
       }, key);
       return { message: 'Account created.' };
     }
@@ -554,19 +574,20 @@ async function mutate(req, res, action, key) {
         return { message: 'Creator code applied. Giveaway entry recorded.' };
       }
       case 'daily': {
-        ensure(patch && Boolean(patch.sample) === Boolean(user.demo), 'Select an eligible patch.');
-        ensure(patch.rankings.some(row => row.name === body.weapon), 'Choose a weapon from this patch.');
+        const dailyPatch = patch || (demo && body.patch === samplePatch.id ? samplePatch : null);
+        ensure(dailyPatch, 'Select an eligible patch.');
+        ensure(dailyPatch.rankings.some(row => row.name === body.weapon), 'Choose a weapon from this patch.');
         ensure(inChallenge(user), 'Your challenge has ended.');
-        ensure(user.demo || user.googleSub, 'Verify with Google to earn redeemable points.', 403);
+        ensure(user.demo || user.googleSub || (demo && dailyPatch.sample), 'Verify with Google to earn redeemable points.', 403);
         credit(user, `daily:${new Date().toISOString().slice(0, 10)}`, `Daily meta pick · ${body.weapon}`, rewardRules.daily, log);
         finishDemoReferral(data, user, log);
         return { message: `Daily meta pick recorded. +${rewardRules.daily} pts.` };
       }
       case 'check-in':
       case 'trivia': {
-        ensure(user.demo || user.googleSub, 'Verify with Google to earn rewards.', 403);
+        ensure(demo || user.demo || user.googleSub, 'Verify with Google to earn rewards.', 403);
         const quiz = dailyQuiz();
-        ensure(!body.date || body.date === quiz.date, 'The daily missions refreshed. Open Missions again.', 409);
+        ensure(!body.date || body.date === quiz.date, 'The daily missions refreshed. Open Rewards again.', 409);
         if (action === 'trivia') ensure(body.answer === quiz.correct, 'Try another answer.');
         const points = action === 'trivia' ? rewardRules.trivia : rewardRules.checkIn;
         credit(user, `${action}:${quiz.date}`, action === 'trivia' ? 'Daily archive trivia' : 'Daily check-in', points, log);
@@ -574,14 +595,14 @@ async function mutate(req, res, action, key) {
         return { message: `Mission complete. +${points} points.` };
       }
       case 'archive-quiz': {
-        ensure(user.demo || user.googleSub, 'Verify with Google to earn rewards.', 403);
+        ensure(demo || user.demo || user.googleSub, 'Verify with Google to earn rewards.', 403);
         ensure(body.year === starterQuiz.correct, 'Try again. The hint is in the first mission.');
         credit(user, 'archive-quiz', 'First ILLCAMS archive challenge', rewardRules.archive, log);
         finishDemoReferral(data, user, log);
         return { message: `Archive challenge solved. +${rewardRules.archive} pts.` };
       }
       case 'comeback': {
-        ensure(user.demo || user.googleSub, 'Verify with Google to earn rewards.', 403);
+        ensure(demo || user.demo || user.googleSub, 'Verify with Google to earn rewards.', 403);
         const journey = engagement(user);
         ensure(journey.comeback, 'There’s no comeback bonus available right now.', 409);
         credit(user, `comeback:${utcDate(journey.comebackActivity)}`, 'Comeback bonus', journey.comeback, log);
@@ -645,7 +666,7 @@ async function mutate(req, res, action, key) {
       }
       case 'redeem': {
         const item = products.find(product => product.id === body.product);
-        ensure(item && (user.demo || user.googleSub) && (!item.demoOnly || user.demo), 'This reward requires an eligible account.', 403);
+        ensure(item && (demo || user.demo || user.googleSub) && (!item.demoOnly || user.demo), 'This reward requires an eligible account.', 403);
         const attempt = clean(body.attempt, 40);
         ensure(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(attempt), 'Invalid redemption request.');
         const id = `${user.id}:${attempt}`;
@@ -701,7 +722,17 @@ async function trackChecks() {
   return result;
 }
 
-const assets = { '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/style.css': ['style.css', 'text/css; charset=utf-8'], '/arena.png': ['arena.png', 'image/png'], '/hero.png': ['hero.png', 'image/png'], '/hero.mp4': ['hero.mp4', 'video/mp4'] };
+const vendorFiles = {
+  '/vendor/react.js': ['react/umd/react.production.min.js', 'react@18.3.1/umd/react.production.min.js', 'text/javascript; charset=utf-8'],
+  '/vendor/react-dom.js': ['react-dom/umd/react-dom.production.min.js', 'react-dom@18.3.1/umd/react-dom.production.min.js', 'text/javascript; charset=utf-8'],
+  '/vendor/tailwind.css': ['tailwindcss/dist/tailwind.min.css', 'tailwindcss@2.2.19/dist/tailwind.min.css', 'text/css; charset=utf-8']
+};
+const assets ={ '/': ['index.html', 'text/html; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/style.css': ['style.css', 'text/css; charset=utf-8'], '/arena.png': ['arena.png', 'image/png'], '/hero.png': ['hero.png', 'image/png'], '/hero.mp4': ['hero.mp4', 'video/mp4'] };
+for (const file of ['club-bootstrap.js', 'afterimage.js', 'club-ui.js', 'club-pages.js', 'rewards-ui.js', 'shop-ui.js', 'gallery-data.js', 'esports-data.js', 'shop-data.js']) {
+  assets['/' + file] = [file, 'text/javascript; charset=utf-8'];
+}
+assets['/afterimage.css'] = ['afterimage.css', 'text/css; charset=utf-8'];
+assets['/hero-placeholder.mp4'] = ['hero-placeholder.mp4', 'video/mp4'];
 assets['/experience.js'] = ['experience.js', 'text/javascript; charset=utf-8'];
 assets['/experience.css'] = ['experience.css', 'text/css; charset=utf-8'];
 for (const name of ['stage', 'missions', 'invites']) assets[`/art/${name}.jpg`] = [`art/${name}.jpg`, 'image/jpeg'];
@@ -713,7 +744,7 @@ const server = createServer(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' https://fazeclan.com https://cdn.shopify.com https://i.ytimg.com; media-src 'self' https:; frame-src https://www.youtube-nocookie.com; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; style-src 'self' https://cdn.jsdelivr.net; font-src 'self'; img-src 'self' https:; media-src 'self' https:; frame-src https://www.youtube-nocookie.com; script-src 'self' https://cdn.jsdelivr.net; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
   try {
     const url = new URL(req.url, origin);
     const key = sessionKey(req);
@@ -732,7 +763,7 @@ const server = createServer(async (req, res) => {
         res.writeHead(204).end();
         return;
       }
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Replay email preferences</title><link rel="stylesheet" href="/style.css"><main><section class="panel pad flow"><h1>Replay email preferences</h1><p>Turn off email updates for this account.</p><form action="/mail/unsubscribe?token=${unsubscribe}" method="post"><button class="btn primary" type="submit">Unsubscribe</button></form></section></main></html>`);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Afterimage email preferences</title><link rel="stylesheet" href="/style.css"><main><section class="panel pad flow"><h1>Afterimage email preferences</h1><p>Turn off email updates for this account.</p><form action="/mail/unsubscribe?token=${unsubscribe}" method="post"><button class="btn primary" type="submit">Unsubscribe</button></form></section></main></html>`);
       return;
     }
     if (req.method === 'POST' && url.pathname === '/api/matches/import') return json(res, 200, await importMatch(req));
@@ -797,6 +828,16 @@ const server = createServer(async (req, res) => {
       ensure(eligible && target && new URL(target).protocol === 'https:', 'Video is unavailable for this account.', 403);
       return res.writeHead(302, { Location: target }).end();
     }
+    if (Object.hasOwn(vendorFiles, url.pathname)) {
+      const [local, cdn, mime] = vendorFiles[url.pathname];
+      try {
+        const bytes = await readFile(new URL('./node_modules/' + local, import.meta.url));
+        return res.writeHead(200, { 'Content-Type': mime }).end(bytes);
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+        return res.writeHead(302, { Location: 'https://cdn.jsdelivr.net/npm/' + cdn }).end();
+      }
+    }
     const asset = Object.hasOwn(assets, url.pathname) ? assets[url.pathname] : null;
     ensure(asset, 'Page not found.', 404);
     let bytes;
@@ -840,4 +881,4 @@ if (mailConfigured(origin)) {
   void sendPending();
 }
 
-server.listen(port, process.env.HOST || '127.0.0.1', () => console.log(`Patchline ready at ${origin} · ${store.name}${demo ? ' · demo enabled' : ''}`));
+server.listen(port, process.env.HOST || '127.0.0.1', () => console.log(`FaZe Afterimage ready at ${origin} · ${store.name}${demo ? ' · demo enabled' : ''}`));

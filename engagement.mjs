@@ -55,8 +55,8 @@ export function engagement(user, now = Date.now(), profile) {
   const daysAway = Math.max(0, Math.floor((now - lastActivity) / day));
   const started = actions.length > 0 || Boolean(user.matches?.length || user.lastReviewAt);
   const stage = !started ? 'new' : daysAway >= returnAfterDays ? 'returning' : 'active';
-  const reason = stage === 'returning' ? `Your last Replay activity was ${daysAway} days ago.`
-    : stage === 'active' ? `You recorded Replay activity in the last ${returnAfterDays} days.`
+  const reason = stage === 'returning' ? `Your last Afterimage activity was ${daysAway} days ago.`
+    : stage === 'active' ? `You recorded Afterimage activity in the last ${returnAfterDays} days.`
     : 'Your profile is ready for its first mission.';
   const preferences = (user.favoriteGames || []).filter(game => games.includes(game));
   const primaryGame = profile[0]?.game || preferences[0] || Object.keys(user.links)[0] || null;
@@ -93,7 +93,7 @@ export function addNotice(user, notice, now = Date.now()) {
 export function syncNotices(user, now = Date.now()) {
   const status = engagement(user, now, []);
   if (!user.welcomed) {
-    addNotice(user, { id: 'welcome', title: 'Welcome to Replay', message: 'Pick your games and earn your first points in the walkthrough.', route: '#welcome' }, now);
+    addNotice(user, { id: 'welcome', title: 'Welcome to Afterimage', message: 'Pick your games and earn your first points in the walkthrough.', route: '#welcome' }, now);
     user.welcomed = true;
   }
   if (status.stage === 'returning') {
@@ -104,7 +104,7 @@ export function syncNotices(user, now = Date.now()) {
       id: `return-${utcDate(status.lastActivity)}`, kind: 'returning',
       title: status.comeback ? `Your ${status.comeback}-point comeback is ready` : 'Your daily missions are ready',
       message: status.comeback ? `Your last activity was ${status.daysAway} days ago. Claim your comeback and see today’s missions.`
-        : `It’s been ${status.daysAway} days since your last Replay activity. Come back for today’s check-in and archive question.`,
+        : `It’s been ${status.daysAway} days since your last Afterimage activity. Come back for today’s check-in and archive question.`,
       route: '#missions',
       email: true
     }, now);

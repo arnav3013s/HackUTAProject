@@ -3,3 +3,4 @@ content.json
 data/
 node_modules/
 public/hero.mp4
+.local-node/
