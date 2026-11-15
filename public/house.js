@@ -4,6 +4,7 @@ export const housePages = [
   { route:'passport', name:'Gaming Passport', note:'Earn XP, level up, and collect badges', icon:'person' },
   { route:'og', name:'OG Club', note:'Membership perks for day-one fans', icon:'star' },
   { route:'drops', name:'Exclusive Drops', note:'Limited-edition FaZe merch', icon:'cart' },
+  { route:'next', name:'FaZe NEXT', note:'Submit clips, vote, and follow the finale', icon:'play' },
   { route:'clan', name:'Clan', note:'Meet the FaZe community', icon:'globe' }
 ];
 export function inHouse(page) { return page === 'house' || housePages.some(item=>item.route===page); }

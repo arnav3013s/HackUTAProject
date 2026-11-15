@@ -48,7 +48,7 @@ for(const game of patchGames)for(const patch of game.patches)add('patch:'+patch.
 const rewardsText='Daily check-in gives '+rewardRules.checkIn+' points and archive trivia gives '+rewardRules.trivia+'. Rewards include '+products.map(item=>item.name+' ('+item.price+' points'+(item.demoOnly?', demo only':'')+')').join(', ')+'. Spendable points are separate from Passport XP.';
 add('rewards','Rewards','/#rewards','earn spend wallet points redeem tasks missions',rewardsText);
 add('shop','Shop','/#shop','store buy cart merch apparel gift',storeProducts.slice(0,10).map(item=>item.name).join(', ')+'. Open the store for current product details.');
-add('house','FaZe House','/house','navigation where open find site clan community', 'FaZe House houses Gaming Passport, OG Club, Exclusive Drops, and Clan. FaZe NEXT is under More.');
+add('house','FaZe House','/house','navigation where open find site clan community', 'FaZe House houses Gaming Passport, OG Club, Exclusive Drops, FaZe NEXT, and Clan.');
 add('clan','Clan','/clan','clan community creator archive','Browse community and fan content.');
 add('privacy','Account and privacy','/privacy','account privacy login reset help','Sign in through the header; use Forgot password on the login form.');
 
@@ -171,5 +171,5 @@ export function siteAnswer({q,topic,team,past,docs},ctx){
   if(topic==='rewards')return answer(rewardsText,[link('Rewards','/#rewards')]);
   if(topic==='shop')return answer('Browse Shop for current listings and product links. Exclusive Drops shows limited editions and eligibility.',[link('Shop','/#shop'),link('Exclusive Drops','/drops')]);
   if(topic==='general')return answer('Gemini is unavailable right now. You can still ask about FaZe, gaming, or this site.',[house]);
-  return answer('FaZe House brings together Gaming Passport, OG Club, Exclusive Drops, and Clan. FaZe NEXT is under **More**.',[house,link('FaZe NEXT','/next')]);
+  return answer('FaZe House brings together Gaming Passport, OG Club, Exclusive Drops, FaZe NEXT, and Clan.',[house,link('FaZe NEXT','/next')]);
 }

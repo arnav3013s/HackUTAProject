@@ -15,7 +15,7 @@ import { DropCheckout, DropsPage, MyFaze, OgPage, PassportPage } from './program
 import { NextPage } from './next-ui.js';
 
 const simpleLinks = [['home','Home'],['about','About Us'],['news','News'],['esports','Esports'],['teams','Teams'],['gallery','Gallery'],['house','FaZe House'],['shop','Shop'],['rewards','Rewards']];
-const extraLinks = [['fanlab','Fan Lab'],['watch','Video archive'],['patch-intel','Patch Intel'],['next','FaZe NEXT'],['performance','Match activity'],['inbox','Inbox'],['tracks','MLH tracks']];
+const extraLinks = [['fanlab','Fan Lab'],['watch','Video archive'],['patch-intel','Patch Intel'],['performance','Match activity'],['inbox','Inbox'],['tracks','MLH tracks']];
 const compactNav = new Set(['news','teams','gallery']);
 const legacy = new Set(['account','ask','inbox','leaderboard','patches','performance','receipts','tracks','watch','welcome']);
 const linkFor = key => ['about','clan','house','teams','patch-intel','passport','og','drops','next'].includes(key) ? '/'+key : '/#'+key;
