@@ -1,6 +1,8 @@
 import { createServer } from 'node:http';
 import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { createReadStream, existsSync } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
+import { pipeline } from 'node:stream/promises';
 import { promisify } from 'node:util';
 import { creators, games, matchRules, news, products, rewardRules, samplePatch } from './catalog.mjs';
 import { faze } from './faze.mjs';
@@ -14,6 +16,8 @@ import { addNotice, dailyQuiz, deliverNotices, engagement, inboxView, mailConfig
 const scrypt = promisify(scryptCallback);
 const port = Number(process.env.PORT || 4173);
 const origin = new URL(process.env.PUBLIC_ORIGIN || `http://localhost:${port}`).origin;
+const homepageVideo = process.env.HERO_VIDEO_URL ||
+  (existsSync(new URL('./public/hero.mp4', import.meta.url)) ? '/hero.mp4' : '/hero-placeholder.mp4');
 const secure = origin.startsWith('https:');
 const demo = process.env.DEMO_MODE === '1' || (process.env.DEMO_MODE !== '0' && !process.env.PUBLIC_ORIGIN);
 const google = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -146,7 +150,7 @@ function publicState(data, user) {
     })),
     standings: leagueEntries.map(({ name, game, league, score }) => ({ name, game, league, score })),
     clips,
-    config: { demo, google, email: mailConfigured(origin), gemini: Boolean(process.env.GEMINI_API_KEY), receiptAuthority: Boolean(process.env.SOLANA_RECEIPT_AUTHORITY), database: store.name, heroVideo: process.env.HERO_VIDEO_URL || '/hero-placeholder.mp4', memberVideo: Boolean(process.env.MEMBER_VIDEO_URL) }
+    config: { demo, google, email: mailConfigured(origin), gemini: Boolean(process.env.GEMINI_API_KEY), receiptAuthority: Boolean(process.env.SOLANA_RECEIPT_AUTHORITY), database: store.name, heroVideo: homepageVideo, memberVideo: Boolean(process.env.MEMBER_VIDEO_URL) }
   };
   if (!user) return result;
   const owned = Object.values(data.redemptions).filter(order => order.user === user.id);
@@ -740,6 +744,37 @@ for (const [file, mime] of [['logo.png', 'image/png'], ['tiger.jpg', 'image/jpeg
   assets[`/brand/${file}`] = [`brand/${file}`, mime];
 }
 const json = (res, status, payload) => res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }).end(JSON.stringify(payload));
+
+async function streamVideo(req, res, path) {
+  const { size } = await stat(path);
+  const headers = { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes' };
+  const range = req.method === 'GET' ? req.headers.range : null;
+  let start = 0;
+  let end = size - 1;
+  if (range) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+    const invalid = () => res.writeHead(416, { ...headers, 'Content-Range': `bytes */${size}` }).end();
+    if (!match || (!match[1] && !match[2])) return invalid();
+    const [, first, last] = match;
+    if (first) {
+      start = Number(first);
+      if (last) end = Math.min(Number(last), end);
+    } else {
+      start = Math.max(0, size - Number(last));
+    }
+    if (!Number.isSafeInteger(start) || start > end) return invalid();
+    headers['Content-Range'] = `bytes ${start}-${end}/${size}`;
+  }
+  headers['Content-Length'] = end - start + 1;
+  res.writeHead(range ? 206 : 200, headers);
+  if (req.method === 'HEAD' || size === 0) return res.end();
+  try {
+    await pipeline(createReadStream(path, { start, end }), res);
+  } catch (error) {
+    if (error.code !== 'ERR_STREAM_PREMATURE_CLOSE') throw error;
+  }
+}
+
 const server = createServer(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -768,6 +803,14 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url.pathname === '/api/matches/import') return json(res, 200, await importMatch(req));
     if (req.method === 'POST' && url.pathname.startsWith('/api/')) return json(res, 200, await mutate(req, res, url.pathname.slice(5), key));
+    const asset = Object.hasOwn(assets, url.pathname) ? assets[url.pathname] : null;
+    if (asset?.[1] === 'video/mp4' && ['GET', 'HEAD'].includes(req.method)) {
+      try { return await streamVideo(req, res, new URL(`./public/${asset[0]}`, import.meta.url)); }
+      catch (error) {
+        if (error.code === 'ENOENT') return json(res, 404, { error: 'Asset not found.' });
+        throw error;
+      }
+    }
     ensure(req.method === 'GET', 'Method not allowed.', 405);
     if (url.pathname === '/health') {
       await store.read();
@@ -838,7 +881,6 @@ const server = createServer(async (req, res) => {
         return res.writeHead(302, { Location: 'https://cdn.jsdelivr.net/npm/' + cdn }).end();
       }
     }
-    const asset = Object.hasOwn(assets, url.pathname) ? assets[url.pathname] : null;
     ensure(asset, 'Page not found.', 404);
     let bytes;
     try { bytes = await readFile(new URL(`./public/${asset[0]}`, import.meta.url)); }

@@ -34,7 +34,7 @@ Open [http://localhost:4173](http://localhost:4173). For a quick start, run `nod
 
 ## Update the homepage clip
 
-Save the final clip as `public/hero.mp4`. Copy `.env.example` to `.env`, set `HERO_VIDEO_URL=/hero.mp4`, and restart. A published HTTPS MP4 URL also works. Newsletter signup records addresses in the database. Newsletter broadcasting requires a sender integration.
+Save the final clip as `public/hero.mp4` and restart. Use `HERO_VIDEO_URL` in `.env` to select another video URL. Newsletter signup records addresses in the database. Newsletter broadcasting requires a sender integration.
 
 Run `npm test` to run the original server regression suite.
 
@@ -54,7 +54,7 @@ Reference docs for [Gemini structured output](https://ai.google.dev/gemini-api/d
 1. Copy `.env.example` to `.env` and `content.example.json` to `content.json`. Set `DEMO_MODE=0`, `PUBLIC_ORIGIN` to your public HTTPS URL, and the provider settings from the table. Keep the demo and live databases separate. The optional SQLite fallback is suitable for local tests.
 2. Create a Google OAuth web client with `<PUBLIC_ORIGIN>/auth/google/callback` as an authorized redirect URI. Enable the YouTube Data API for channel linking. Supply `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and comma-separated lists in `OPERATOR_EMAILS` and `REVIEWER_EMAILS`. Reviewer access requires a verified account and a linked YouTube channel. Operators approve surveys from other reviewers. The Account page lists outstanding surveys.
 3. For a Vultr host with Docker Compose, set `CONTENT_FILE=/app/content.json` to load curated content and run `docker compose up -d --build`. Check `/health` for the connected database. Install the `pg` dependency with `npm install` when connecting to Tiger Cloud outside Docker.
-4. For homepage footage, put an MP4 in `public/hero.mp4` and set `HERO_VIDEO_URL=/hero.mp4`, or set it to an HTTPS video URL. The bundled placeholder reel is used when the setting is empty. The home hero respects reduced-motion preferences and has a pause control. Use `MEMBER_VIDEO_URL` for the Intel Pass and the `rewinds` object in `content.json` for individual returning-player footage, keyed by verified email. Use access-controlled media URLs for private footage.
+4. For homepage footage, put an MP4 in `public/hero.mp4` or set `HERO_VIDEO_URL` to an HTTPS video URL. The bundled placeholder reel is used when the local MP4 and override are absent. The home hero respects reduced-motion preferences and has a pause control. Use `MEMBER_VIDEO_URL` for the Intel Pass and the `rewinds` object in `content.json` for individual returning-player footage, keyed by verified email. Use access-controlled media URLs for private footage.
 5. Add curated clips as objects with `title`, `game`, `creator` and `url`. Add standings as objects with `name`, `game`, `league` and numeric `score`. Private rows also use `"private": true` and a `members` array of lowercase verified email addresses.
 
 ### Patch ingestion

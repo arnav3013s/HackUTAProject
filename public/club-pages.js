@@ -97,6 +97,7 @@ export function News({ data, play }) {
 export function Home({ data, openAuth, play }) {
   const video=useRef(null);
   const [playing,setPlaying]=useState(false);
+  const [videoReady,setVideoReady]=useState(false);
   const [reduced]=useState(()=>matchMedia('(prefers-reduced-motion: reduce)').matches);
   useEffect(()=>{
     if(!video.current || reduced) return;
@@ -105,9 +106,14 @@ export function Home({ data, openAuth, play }) {
   const moments=gallery.slice(0,3);
   const legacyVideo=data?.faze.videos.find(clip=>clip.id==='rACwtbTSqwE');
   return h('div',{className:'ai-home'},
-    h('section',{className:'ai-hero'},
+    h('section',{className:videoReady?'ai-hero ai-hero-video-ready':'ai-hero'},
       h(Image,{className:'ai-hero-poster',src:'/art/stage.jpg',alt:'',priority:true,fallback:null}),
-      data?.config?.heroVideo && h('video',{className:'ai-hero-video',ref:video,src:data.config.heroVideo,muted:true,loop:true,playsInline:true,preload:reduced?'none':'metadata',onPlay:()=>setPlaying(true),onPause:()=>setPlaying(false),'aria-hidden':true}),
+      data?.config?.heroVideo && h('video',{
+        className:'ai-hero-video',ref:video,src:data.config.heroVideo,muted:true,loop:true,playsInline:true,
+        preload:reduced?'none':'metadata',onLoadedData:()=>setVideoReady(true),
+        onError:()=>{setVideoReady(false);setPlaying(false);},
+        onPlay:()=>setPlaying(true),onPause:()=>setPlaying(false),'aria-hidden':true
+      }),
       h('div',{className:'ai-hero-shade'}),h('div',{className:'ai-hero-lines','aria-hidden':true}),
       h('div',{className:'ai-hero-body'},
         h('div',{className:'ai-hero-copy'},

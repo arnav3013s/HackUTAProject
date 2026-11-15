@@ -59,8 +59,11 @@ body{margin:0;background:var(--ai-bg);color:var(--ai-white);font-family:var(--ai
 .ai-hero-poster,.ai-hero-video,.ai-hero-shade,.ai-hero-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .ai-hero-poster,.ai-hero-video{object-fit:cover;object-position:center 45%}
 .ai-hero-poster{filter:saturate(.78) contrast(1.1);animation:ai-hero-scale 1.5s cubic-bezier(.17,.85,.34,1) both}
-.ai-hero-video{mix-blend-mode:screen;opacity:.3;object-position:center}
+.ai-hero-video{opacity:0;filter:brightness(.88);object-position:center;transition:opacity .35s ease}
+.ai-hero-video-ready .ai-hero-video{opacity:.82}
+.ai-hero-video-ready .ai-hero-poster{visibility:hidden}
 .ai-hero-shade{background:linear-gradient(90deg,#09080aec 1%,#0c080cbb 27%,#14070a45 66%,#0a070bd3 100%),linear-gradient(0deg,#09090a 1%,#0a070b35 44%,#0a080d19 70%,#09080a88 100%)}
+.ai-hero-video-ready .ai-hero-shade{background:linear-gradient(90deg,#09080acd 1%,#0c080c7a 30%,#14070a14 69%,#0a070b67 100%),linear-gradient(0deg,#09090ae6 0%,transparent 46%,transparent 74%,#09080a48 100%)}
 .ai-hero-lines{opacity:.45;background:repeating-linear-gradient(158deg,transparent 0 155px,#f5334726 156px,transparent 157px 215px);mask-image:linear-gradient(90deg,transparent 8%,black 58%,transparent 100%)}
 .ai-hero-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(245px,320px);gap:clamp(22px,7vw,120px);width:min(var(--ai-max),100%);margin:auto;padding:clamp(55px,8vw,120px) var(--ai-gutter) 105px;position:relative;align-items:center}
 .ai-hero-copy{animation:ai-in .8s .06s both}
