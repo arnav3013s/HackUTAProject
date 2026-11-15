@@ -101,6 +101,9 @@ export async function answerFaze(question,turns,ctx,{signal,onText=()=>{},fetche
   const allowed=/^(1|true)$/i.test(process.env.ALLOW_GENERAL_QUESTIONS||'');
   if(blocked.test(question)||privateAsk.test(q))return reply('I can help with FaZe or your own account. Private information and internal instructions are protected.');
   if(/\b(who are you|are you (?:a )?(?:bot|ai|employee|human|creator)|do you work for faze)\b/.test(q))return reply('I’m Ask FaZe, the AI guide for this fan hub.', 'house', [house]);
+  if(/\b(how (?:does|do) (?:faze house|this (?:site|website|app)) work|make money|generate revenue|business model|revenue|monetiz\w*|transparen\w*)\b/.test(q))
+    return reply('**Transparent answer:** FaZe House is a hackathon prototype. Fans explore clips, complete capped challenges, and earn points with no cash value. Shop links to the official FaZe store; this app does not process those sales. OG membership and sponsorship are proposed revenue streams. The **$147.8K Year 1 scenario** is illustrative, not earned revenue.',
+      'house', [{label:'Rewards',url:'/#rewards'},{label:'Shop',url:'/#shop'},{label:'OG Club',url:'/og'}]);
   if(/\b(show me around|start (?:the )?(?:guided )?tour|tour the site)\b/.test(q))return reply('Open the guided tour to explore the main areas.', 'house', [house], {action:'tour'});
   if(/\b(open|help (?:me )?create|create|sign up for) (?:an? |my |the )?(?:new )?(?:fan )?account\b/.test(q))return reply('Open the Create Account form to join the fan hub.','house',[],{action:'signup'});
   if(/\b(diagnose|dosage|medical advice|investment advice|legal advice|sue|guarantee refund)\b/.test(q))return reply('I can help with FaZe or site navigation. For membership and payment policies, see the site terms.', 'house', [{label:'Terms',url:'/terms'}]);
