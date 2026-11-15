@@ -7,8 +7,6 @@ Place approved FaZe portraits at these paths. Use lowercase slugs and `.webp`; e
 | Counter-Strike | frozen | `public/images/players/counter-strike/frozen.webp` | needs photo |
 | Counter-Strike | Twistzz | `public/images/players/counter-strike/twistzz.webp` | needs photo |
 | Counter-Strike | jcobbb | `public/images/players/counter-strike/jcobbb.webp` | needs photo |
-| Counter-Strike | Neityu | `public/images/players/counter-strike/neityu.webp` | needs photo |
-| Counter-Strike | JBOEN | `public/images/players/counter-strike/jboen.webp` | needs photo |
 | Counter-Strike | broky | `public/images/players/counter-strike/broky.webp` | needs photo |
 | Counter-Strike | NEO | `public/images/players/counter-strike/neo.webp` | needs photo |
 | Call of Duty | Simp | `public/images/players/call-of-duty/simp.webp` | needs photo |

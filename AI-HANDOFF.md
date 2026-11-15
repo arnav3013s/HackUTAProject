@@ -12,7 +12,7 @@ The main experience serves new fans and returning fans: open a clip, explore cur
 | --- | --- |
 | `public/clan.js` | React shell, URLs, header/footer, login/signup dialog, theme switch, first visit behavior, route dispatcher. `/about`, `/teams`, `/clan`, `/players/:slug`, `/terms`, and `/privacy` are path routes; most older screens are hash routes. |
 | `public/club-pages.js` | Home, Esports, News, Gallery, Clan, video modal, and Fan Lab in More. |
-| `public/teams-data.js` | **Only current roster source for Teams**: six ordered divisions and 28 named players/coaches. `rosters.mjs` is a historical/archive API source and must not be used to add former players to Teams. |
+| `public/teams-data.js` | **Only current roster source for Teams**: six ordered divisions and 26 named players/coaches. `rosters.mjs` is a historical/archive API source and must not be used to add former players to Teams. |
 | `public/teams-page.js`, `public/player-page.js` | Searchable current roster with local portrait convention, then player profiles with explicitly sample charts. |
 | `public/about-data.js`, `public/about-page.js` | Owner supplied About facts, `[VERIFY]` timeline comments, placeholders, page components and partner form. |
 | `public/rewards-ui.js`, `catalog.mjs`, `engagement.mjs`, `fans.mjs` | Points presentation, reward prices/rules, daily/weekly progress, wallet FIFO spending and expiry, categories and returning status. |
@@ -44,7 +44,7 @@ Live email uses Resend and explicit opt in from Inbox. Newsletter signup stores 
 
 ## Current media and content
 
-Gallery has 26 checked remote photos after replacing five broken URLs and removing four without trustworthy replacements. `scripts/audit-gallery.mjs --videos` checks gallery images and seven YouTube thumbnail URLs. The hero reel and poster are local files. The Smash division image is a local SVG. All 28 player portraits are expected at `public/images/players/{game-slug}/{player-slug}.webp`; none were supplied, so silhouette fallbacks are intentional. See `ASSET-AUDIT.md` and `PLAYER-PHOTO-CHECKLIST.md`.
+Gallery has 26 checked remote photos after replacing five broken URLs and removing four without trustworthy replacements. `scripts/audit-gallery.mjs --videos` checks gallery images and seven YouTube thumbnail URLs. The hero reel and poster are local files. The Smash division image is a local SVG. All 26 player portraits are expected at `public/images/players/{game-slug}/{player-slug}.webp`; none were supplied, so silhouette fallbacks are intentional. See `ASSET-AUDIT.md` and `PLAYER-PHOTO-CHECKLIST.md`.
 
 About placeholders are in `public/about-data.js`. Do not invent leadership, partners, founding year, press contact, unknown division dates, or an overall championship count. Profile chart values are labeled sample. Esports upcoming events and standings are placeholders until an authorized source is connected. The points leaderboard shows badge targets but does not award prizes. Keep all such labels honest.
 

@@ -4,7 +4,7 @@ const roster = (game, status, players, alumni, source = directory) => ({
 });
 
 export const rosters = [
-  roster('Counter-Strike 2', 'November 2026 lineup', 'frozen|Twistzz|jcobbb|Neityu|JBOEN', 'broky (inactive)|rain|karrigan|ropz|olofmeister|NiKo|coldzera|GuardiaN|Kjaerbye|Bymas|s1mple (loan)|jks|USTILO|es3tag|kioShiMa|allu|aizy|jkaem|fox|Maikelele', 'https://www.hltv.org/team/6667/faze'),
+  roster('Counter-Strike 2', 'November 2026 lineup', 'frozen|Twistzz|jcobbb', 'broky (inactive)|rain|karrigan|ropz|olofmeister|NiKo|coldzera|GuardiaN|Kjaerbye|Bymas|s1mple (loan)|jks|USTILO|es3tag|kioShiMa|allu|aizy|jkaem|fox|Maikelele', 'https://www.hltv.org/team/6667/faze'),
   roster('Call of Duty', 'FaZe Vegas · announced 2027 lineup', 'Simp|Scrap|HyDra|Alluka', 'aBeZy|Cellium|Drazah|Abuzah|04|SlasheR|Arcitys|Priestahh|MajorManiak|Classic|Prestinni|Sib|GRVTY|JurNii|ZooMaa|Attach|Clayster|Enable|Censor|Aches|Karma|JKap|Parasite|Replays / Crowder|Methodz|Skrapz|Zer0|Jurd|Asim|MBoZe|Theory|Dedo|Saints|FormaL|Slacked|Loony|Gunless|Huke|Temp|Heist|Sham|Folsom|Secretly|Vengeance|Huhdle|SpaceLy|John|Proofy|Study|Ricky|Accuracy|FeLo|Naga|CouRage|RanbOw|Toto|Malls|Vortex|Zayrox|Riskin', 'https://fazevegas.com/pages/latest'),
   roster('Rainbow Six Siege', 'Publisher roster', 'cyber|soulz1|Vitaking|Handyy|Kds', 'Astro|cameram4n|Bullet1|mav|yoona|ion|gohaN|Muringa|Nino|Sn4rFx|Twister', 'https://www.ubisoft.com/en-us/esports/rainbow-six/siege/team/5/roster'),
   roster('PUBG', 'Supplied January 2026 snapshot', 'Fexx|Jeemzz|Gustav|curexi|vard', 'fuzzface|mxey|ubah|Aitzy|D1gg3r1|Smeef|Haxete|Jembty|rawryy|Mista|Baldy|Simms|MeToR'),

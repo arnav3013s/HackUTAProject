@@ -11,7 +11,7 @@ This list describes every created or edited working-tree file in this pass. `git
 | `ASSET-AUDIT.md` | Recorded every failed gallery source and its resolution. |
 | `DATABASE-MIGRATION.md` | Documented the actual three-table store, four account types and a proposed nine-table migration. |
 | `IMPLEMENTATION-REVIEW.md` | Added the item-by-item status, placeholders and planning estimates. |
-| `PLAYER-PHOTO-CHECKLIST.md` | Listed all 28 expected portrait paths and missing-photo status. |
+| `PLAYER-PHOTO-CHECKLIST.md` | Listed all 26 expected portrait paths and missing-photo status. |
 | `FULL-UPDATED-CODE.md` | Collected the complete current contents of every changed text file for copying. |
 | `Start-Clan.cmd` | Renamed the Windows launcher for the Clan page branding. |
 | `assistant.mjs` | Added current-roster evidence and updated guide branding. |

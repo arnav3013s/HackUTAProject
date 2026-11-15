@@ -51,7 +51,7 @@ The main experience serves new fans and returning fans: open a clip, explore cur
 | --- | --- |
 | `public/clan.js` | React shell, URLs, header/footer, login/signup dialog, theme switch, first visit behavior, route dispatcher. `/about`, `/teams`, `/clan`, `/players/:slug`, `/terms`, and `/privacy` are path routes; most older screens are hash routes. |
 | `public/club-pages.js` | Home, Esports, News, Gallery, Clan, video modal, and Fan Lab in More. |
-| `public/teams-data.js` | **Only current roster source for Teams**: six ordered divisions and 28 named players/coaches. `rosters.mjs` is a historical/archive API source and must not be used to add former players to Teams. |
+| `public/teams-data.js` | **Only current roster source for Teams**: six ordered divisions and 26 named players/coaches. `rosters.mjs` is a historical/archive API source and must not be used to add former players to Teams. |
 | `public/teams-page.js`, `public/player-page.js` | Searchable current roster with local portrait convention, then player profiles with explicitly sample charts. |
 | `public/about-data.js`, `public/about-page.js` | Owner supplied About facts, `[VERIFY]` timeline comments, placeholders, page components and partner form. |
 | `public/rewards-ui.js`, `catalog.mjs`, `engagement.mjs`, `fans.mjs` | Points presentation, reward prices/rules, daily/weekly progress, wallet FIFO spending and expiry, categories and returning status. |
@@ -83,7 +83,7 @@ Live email uses Resend and explicit opt in from Inbox. Newsletter signup stores 
 
 ## Current media and content
 
-Gallery has 26 checked remote photos after replacing five broken URLs and removing four without trustworthy replacements. `scripts/audit-gallery.mjs --videos` checks gallery images and seven YouTube thumbnail URLs. The hero reel and poster are local files. The Smash division image is a local SVG. All 28 player portraits are expected at `public/images/players/{game-slug}/{player-slug}.webp`; none were supplied, so silhouette fallbacks are intentional. See `ASSET-AUDIT.md` and `PLAYER-PHOTO-CHECKLIST.md`.
+Gallery has 26 checked remote photos after replacing five broken URLs and removing four without trustworthy replacements. `scripts/audit-gallery.mjs --videos` checks gallery images and seven YouTube thumbnail URLs. The hero reel and poster are local files. The Smash division image is a local SVG. All 26 player portraits are expected at `public/images/players/{game-slug}/{player-slug}.webp`; none were supplied, so silhouette fallbacks are intentional. See `ASSET-AUDIT.md` and `PLAYER-PHOTO-CHECKLIST.md`.
 
 About placeholders are in `public/about-data.js`. Do not invent leadership, partners, founding year, press contact, unknown division dates, or an overall championship count. Profile chart values are labeled sample. Esports upcoming events and standings are placeholders until an authorized source is connected. The points leaderboard shows badge targets but does not award prizes. Keep all such labels honest.
 
@@ -134,7 +134,7 @@ This list describes every created or edited working-tree file in this pass. `git
 | `ASSET-AUDIT.md` | Recorded every failed gallery source and its resolution. |
 | `DATABASE-MIGRATION.md` | Documented the actual three-table store, four account types and a proposed nine-table migration. |
 | `IMPLEMENTATION-REVIEW.md` | Added the item-by-item status, placeholders and planning estimates. |
-| `PLAYER-PHOTO-CHECKLIST.md` | Listed all 28 expected portrait paths and missing-photo status. |
+| `PLAYER-PHOTO-CHECKLIST.md` | Listed all 26 expected portrait paths and missing-photo status. |
 | `FULL-UPDATED-CODE.md` | Collected the complete current contents of every changed text file for copying. |
 | `Start-Clan.cmd` | Renamed the Windows launcher for the Clan page branding. |
 | `assistant.mjs` | Added current-roster evidence and updated guide branding. |
@@ -271,7 +271,7 @@ All are centralized in `public/about-data.js`: `[ADD FOUNDING YEAR AND FOUNDERS]
 | 7. Esports revamp | Hero, current team carousel, past results, schedule/standings panels, clips. | Upcoming fixtures and standings are visibly empty until a verified feed is connected. |
 | 8. Team carousel | Continuous CSS marquee pauses on hover, focus and active touch; links to Teams. | Motion is disabled by reduced-motion setting. |
 | 9. Smash image | Unrelated remote image replaced by a local FaZe-themed SVG fallback. | Actual approved game/player art can be added later. |
-| 9A. Teams | Six supplied divisions and 28 people; search, selector, horizontal scroll, progress, keyboard/drag/swipe, placeholders and mobile layout. | All 28 approved portraits still need files. |
+| 9A. Teams | Six supplied divisions and 26 people; search, selector, horizontal scroll, progress, keyboard/drag/swipe, placeholders and mobile layout. | All 26 approved portraits still need files. |
 | 9B. Teams Smash | Same local Smash artwork and portrait convention used on Teams. | Sparg0 portrait still needs a file. |
 | 10. Gallery | Audited all 30 original photos, fixed five URLs, removed four without safe replacements; 26 now pass. Local video has poster/fallback; YouTube thumbnails pass. | External publishers can later change image or embed availability. |
 | 11. Player profiles | Profile route for every current member, five summary metrics and six Chart.js views, themed tooltips and labels. | All gameplay and streaming metrics are explicitly sample data. |
@@ -313,8 +313,6 @@ Place approved FaZe portraits at these paths. Use lowercase slugs and `.webp`; e
 | Counter-Strike | frozen | `public/images/players/counter-strike/frozen.webp` | needs photo |
 | Counter-Strike | Twistzz | `public/images/players/counter-strike/twistzz.webp` | needs photo |
 | Counter-Strike | jcobbb | `public/images/players/counter-strike/jcobbb.webp` | needs photo |
-| Counter-Strike | Neityu | `public/images/players/counter-strike/neityu.webp` | needs photo |
-| Counter-Strike | JBOEN | `public/images/players/counter-strike/jboen.webp` | needs photo |
 | Counter-Strike | broky | `public/images/players/counter-strike/broky.webp` | needs photo |
 | Counter-Strike | NEO | `public/images/players/counter-strike/neo.webp` | needs photo |
 | Call of Duty | Simp | `public/images/players/call-of-duty/simp.webp` | needs photo |
@@ -367,7 +365,7 @@ Open the origin printed by the server (usually `http://localhost:4173`). On Wind
 | Home | Video hero, recent and original clips, sourced moments, and current division links. New visitors see a signup dialog and guided tour. |
 | Fan Lab in More | Four synthetic demo personas: Regular, New, Returning, and Pro Streamer. |
 | About Us at `/about` | Owner-supplied history, achievements timeline and filters, division links, counters, values, leadership and partner placeholders, and a validated contact form stored in app state. |
-| Teams at `/teams` | One roster source for six current divisions and 28 players/coaches. Search, game selector, scrollable cards, profile links, and silhouette placeholders until approved portraits are supplied. |
+| Teams at `/teams` | One roster source for six current divisions and 26 players/coaches. Search, game selector, scrollable cards, profile links, and silhouette placeholders until approved portraits are supplied. |
 | Esports | Current divisions in an automatic carousel, past results, upcoming/standings placeholders, highlights, and links to Teams. Real fixture and standing feeds need an operator source. |
 | Clan | Historical eras and video links. The former page name and route were removed. |
 | Gallery | 24 checked source photos, a local video with poster and failure message, and YouTube highlights. Image failures switch to a local placeholder. |
@@ -5682,8 +5680,6 @@ export const teams = [
     player('frozen', 'David Cernansky', 'Slovakia', 'Rifler'),
     player('Twistzz', 'Russel Van Dulken', 'Canada', 'Rifler'),
     player('jcobbb', 'Jakub Pietruszewski', 'Poland', 'Rifler'),
-    player('Neityu', 'Ryan Aubry', 'France', 'Rifler'),
-    player('JBOEN', 'Jason Boe Nielsen', 'Denmark'),
     player('broky', 'Helvijs Saukants', 'Latvia', 'AWPer', { inactive: true }),
     player('NEO', 'Filip Kubski', 'Poland', 'Head Coach', { coach: true })
   ] },

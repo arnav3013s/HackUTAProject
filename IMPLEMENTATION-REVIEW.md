@@ -37,7 +37,7 @@ All are centralized in `public/about-data.js`: `[ADD FOUNDING YEAR AND FOUNDERS]
 | 7. Esports revamp | Hero, current team carousel, past results, schedule/standings panels, clips. | Upcoming fixtures and standings are visibly empty until a verified feed is connected. |
 | 8. Team carousel | Continuous CSS marquee pauses on hover, focus and active touch; links to Teams. | Motion is disabled by reduced-motion setting. |
 | 9. Smash image | Unrelated remote image replaced by a local FaZe-themed SVG fallback. | Actual approved game/player art can be added later. |
-| 9A. Teams | Six supplied divisions and 28 people; search, selector, horizontal scroll, progress, keyboard/drag/swipe, placeholders and mobile layout. | All 28 approved portraits still need files. |
+| 9A. Teams | Six supplied divisions and 26 people; search, selector, horizontal scroll, progress, keyboard/drag/swipe, placeholders and mobile layout. | All 26 approved portraits still need files. |
 | 9B. Teams Smash | Same local Smash artwork and portrait convention used on Teams. | Sparg0 portrait still needs a file. |
 | 10. Gallery | Audited all 30 original photos, fixed five URLs, removed four without safe replacements; 26 now pass. Local video has poster/fallback; YouTube thumbnails pass. | External publishers can later change image or embed availability. |
 | 11. Player profiles | Profile route for every current member, five summary metrics and six Chart.js views, themed tooltips and labels. | All gameplay and streaming metrics are explicitly sample data. |

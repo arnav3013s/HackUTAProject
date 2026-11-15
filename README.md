@@ -20,7 +20,7 @@ Open the origin printed by the server (usually `http://localhost:4173`). On Wind
 | Home | Video hero, recent and original clips, sourced moments, and current division links. New visitors see a signup dialog and guided tour. |
 | Fan Lab in More | Four synthetic demo personas: Regular, New, Returning, and Pro Streamer. |
 | About Us at `/about` | Owner-supplied history, achievements timeline and filters, division links, counters, values, leadership and partner placeholders, and a validated contact form stored in app state. |
-| Teams at `/teams` | One roster source for six current divisions and 28 players/coaches. Search, game selector, scrollable cards, profile links, and silhouette placeholders until approved portraits are supplied. |
+| Teams at `/teams` | One roster source for six current divisions and 26 players/coaches. Search, game selector, scrollable cards, profile links, and silhouette placeholders until approved portraits are supplied. |
 | Esports | Current divisions in an automatic carousel, past results, upcoming/standings placeholders, highlights, and links to Teams. Real fixture and standing feeds need an operator source. |
 | Clan | Historical eras and video links. The former page name and route were removed. |
 | Gallery | 24 checked source photos, a local video with poster and failure message, and YouTube highlights. Image failures switch to a local placeholder. |

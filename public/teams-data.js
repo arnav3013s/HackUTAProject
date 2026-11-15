@@ -8,8 +8,6 @@ export const teams = [
     player('frozen', 'David Cernansky', 'Slovakia', 'Rifler'),
     player('Twistzz', 'Russel Van Dulken', 'Canada', 'Rifler'),
     player('jcobbb', 'Jakub Pietruszewski', 'Poland', 'Rifler'),
-    player('Neityu', 'Ryan Aubry', 'France', 'Rifler'),
-    player('JBOEN', 'Jason Boe Nielsen', 'Denmark'),
     player('broky', 'Helvijs Saukants', 'Latvia', 'AWPer', { inactive: true }),
     player('NEO', 'Filip Kubski', 'Poland', 'Head Coach', { coach: true })
   ] },
